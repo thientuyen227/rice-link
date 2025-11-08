@@ -79,7 +79,13 @@ export default function MapClient(props: BookingProps = {}) {
 
   const [confirmDialog, setConfirmDialog] = useState<{
     show: boolean;
-    shop: any;
+    shop: {
+      name: string;
+      distance: number;
+      capacity: number;
+      dryingPrice: number;
+      dryingAndStoragePrice: number;
+    };
   } | null>(null);
 
   const ROUTES_SOURCE_ID = "routes-source";
@@ -573,7 +579,7 @@ export default function MapClient(props: BookingProps = {}) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Bạn có muốn chọn lò sấy "<span className="font-bold">{confirmDialog.shop.name}</span>" không?
+              Bạn có muốn chọn lò sấy &ldquo;<span className="font-bold">{confirmDialog.shop.name}</span>&rdquo; không?
             </h3>
             <div className="space-y-2 text-sm text-gray-700 mb-6">
               <div>

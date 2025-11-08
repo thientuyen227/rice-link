@@ -124,20 +124,6 @@ export default function AdminPage() {
   // Orders
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // Booking state
-  const [customerName, setCustomerName] = useState("");
-  const [serviceType, setServiceType] = useState("Sấy lúa");
-  const [hasTransport, setHasTransport] = useState(false);
-  const [selectedTransport, setSelectedTransport] = useState("");
-  const [selectedPoint, setSelectedPoint] = useState<{
-    id: number;
-    name: string;
-    lat: number;
-    lng: number;
-    price: string;
-    rating: number;
-  } | null>(null);
-
   useEffect(() => {
     // Only run on client side to avoid hydration mismatch
     if (typeof window !== "undefined") {
@@ -653,9 +639,17 @@ export default function AdminPage() {
                                   </>
                                 )}
                               </div>
-                              <div className="text-right">
-                                <p className="text-xs text-gray-500">{new Date(o.createdAt).toLocaleString("vi-VN")}</p>
-                              </div>
+                              
+                              <div className="text-right space-y-1">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                              o.paymentStatus === 'paid'
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {o.paymentStatus === 'paid' ? '✅ Đã thanh toán' : '⏳ Chưa thanh toán'}
+                            </span>
+                            <p className="text-xs text-gray-500">{new Date(o.createdAt).toLocaleString("vi-VN")}</p>
+                          </div>
                             </div>
                           </div>
 
@@ -1031,7 +1025,7 @@ export default function AdminPage() {
                   <p className="text-2xl font-bold text-green-400">
                     {orders
                       .filter(o => o.paymentStatus === 'paid' && o.servicePrice && o.clientCapacity)
-                      .reduce((sum, o) => sum + (o.servicePrice! * o.clientCapacity!), 0)
+                      .reduce((sum, o) => sum + (o.servicePrice! * o.clientCapacity! + o.clientCapacity! * (o.pricePerKm ??0)), 0)
                       .toLocaleString("vi-VN")} VNĐ
                   </p>
                 </div>
@@ -1044,8 +1038,8 @@ export default function AdminPage() {
                   <p className="text-sm text-gray-400 mb-1">Chờ thanh toán</p>
                   <p className="text-2xl font-bold text-yellow-400">
                     {orders
-                      .filter(o => (o.paymentStatus === 'unpaid' || o.status === 'confirmed') && o.servicePrice && o.clientCapacity)
-                      .reduce((sum, o) => sum + (o.servicePrice! * o.clientCapacity!), 0)
+                      .filter(o => (o.paymentStatus === 'unpaid') && o.servicePrice && o.clientCapacity)
+                      .reduce((sum, o) => sum + (o.servicePrice! * o.clientCapacity! + o.clientCapacity! * (o.pricePerKm ??0)), 0)
                       .toLocaleString("vi-VN")} VNĐ
                   </p>
                 </div>

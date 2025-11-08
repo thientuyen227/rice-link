@@ -906,6 +906,7 @@ export default function ClientPage() {
                     deliveryTime: deliveryTime,
                     paymentMethod: paymentMethod,
                     pricePerKm: hasShippingCompany ? 0 : pricePerKm,
+                    paymentStatus: "unpaid",
                   };
                   setOrders((prev) => [newOrder, ...prev]);
                   setClientName("");
