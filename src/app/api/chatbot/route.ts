@@ -11,29 +11,60 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!process.env.DIALOGFLOW_PROJECT_ID || !process.env.DIALOGFLOW_CLIENT_EMAIL || !process.env.DIALOGFLOW_PRIVATE_KEY) {
-            console.error('Missing Dialogflow env vars:', {
-                hasProjectId: !!process.env.DIALOGFLOW_PROJECT_ID,
-                hasClientEmail: !!process.env.DIALOGFLOW_CLIENT_EMAIL,
-                hasPrivateKey: !!process.env.DIALOGFLOW_PRIVATE_KEY,
-            });
-            throw new Error('Dialogflow configuration is missing');
-        }
-
         // Dynamic import
         const dialogflowModule = await import('@google-cloud/dialogflow');
         const SessionsClient = dialogflowModule.SessionsClient;
 
-        const dialogflowClient = new SessionsClient({
-            credentials: {
+        let credentials;
+        let projectId;
+
+        // Method 1: Use GOOGLE_APPLICATION_CREDENTIALS_JSON (recommended for Vercel)
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+            try {
+                const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+                credentials = {
+                    client_email: serviceAccount.client_email,
+                    private_key: serviceAccount.private_key,
+                };
+                projectId = serviceAccount.project_id;
+                console.log('Using GOOGLE_APPLICATION_CREDENTIALS_JSON');
+            } catch (e) {
+                console.error('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', e);
+                throw new Error('Invalid GOOGLE_APPLICATION_CREDENTIALS_JSON format');
+            }
+        }
+        // Method 2: Use individual env vars (legacy)
+        else if (process.env.DIALOGFLOW_PROJECT_ID && process.env.DIALOGFLOW_CLIENT_EMAIL && process.env.DIALOGFLOW_PRIVATE_KEY) {
+            let privateKey = process.env.DIALOGFLOW_PRIVATE_KEY;
+
+            // Handle base64 encoded key
+            if (!privateKey.includes('BEGIN PRIVATE KEY')) {
+                try {
+                    privateKey = Buffer.from(privateKey, 'base64').toString('utf-8');
+                } catch (e) {
+                    console.error('Base64 decode failed');
+                }
+            }
+
+            // Replace escaped newlines
+            privateKey = privateKey.replace(/\\n/g, '\n');
+
+            credentials = {
                 client_email: process.env.DIALOGFLOW_CLIENT_EMAIL,
-                private_key: process.env.DIALOGFLOW_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            },
-        });
+                private_key: privateKey,
+            };
+            projectId = process.env.DIALOGFLOW_PROJECT_ID;
+            console.log('Using individual env vars');
+        } else {
+            console.error('Missing Dialogflow configuration. Need either GOOGLE_APPLICATION_CREDENTIALS_JSON or DIALOGFLOW_* vars');
+            throw new Error('Dialogflow configuration is missing');
+        }
+
+        const dialogflowClient = new SessionsClient({ credentials });
 
         const sessionId = customSessionId || 'default-session';
         const sessionPath = dialogflowClient.projectAgentSessionPath(
-            process.env.DIALOGFLOW_PROJECT_ID,
+            projectId,
             sessionId
         );
 
