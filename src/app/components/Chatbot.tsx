@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Message {
     id: number;
@@ -104,11 +104,11 @@ export default function Chatbot() {
             {/* Floating Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 bg-blue-600 text-white p-5 rounded-full shadow-xl hover:scale-105 transition-all duration-300 z-50 flex items-center justify-center"
+                className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 sm:p-5 rounded-full shadow-xl hover:scale-105 transition-all duration-300 z-50 flex items-center justify-center"
                 aria-label="Mở trợ lý ảo RiceLink"
             >
                 <svg
-                    className="w-7 h-7"
+                    className="w-6 h-6 sm:w-7 sm:h-7"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -124,24 +124,24 @@ export default function Chatbot() {
 
             {/* Chat Window */}
             {isOpen && (
-                <div className="fixed bottom-6 right-6 w-[420px] h-[550px] bg-white rounded-2xl shadow-2xl z-50 flex flex-col border border-gray-200 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+                <div className="fixed inset-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[420px] sm:h-[550px] bg-gray-800 rounded-2xl shadow-2xl z-50 flex flex-col border border-gray-700 overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-4 flex justify-between items-center">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                    <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 sm:px-5 py-3 sm:py-4 flex justify-between items-center">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-400 rounded-full animate-pulse"></div>
                             <div>
-                                <h3 className="font-semibold text-base">RiceLink Chatbot</h3>
-                                <p className="text-xs text-blue-100">Trực tuyến</p>
+                                <h3 className="font-semibold text-sm sm:text-base">RiceLink Chatbot</h3>
+                                <p className="text-[10px] sm:text-xs text-green-100">Trực tuyến</p>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
                             <button
                                 onClick={clearChat}
-                                className="text-blue-100 hover:text-white transition-colors"
+                                className="text-green-100 hover:text-white transition-colors p-1"
                                 title="Xóa đoạn chat"
                             >
                                 <svg
-                                    className="w-5 h-5"
+                                    className="w-4 h-4 sm:w-5 sm:h-5"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -156,11 +156,11 @@ export default function Chatbot() {
                             </button>
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="text-blue-100 hover:text-white transition-colors"
+                                className="text-green-100 hover:text-white transition-colors p-1"
                                 title="Đóng"
                             >
                                 <svg
-                                    className="w-6 h-6"
+                                    className="w-5 h-5 sm:w-6 sm:h-6"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -177,23 +177,23 @@ export default function Chatbot() {
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 p-5 overflow-y-auto bg-gray-50">
+                    <div className="flex-1 p-3 sm:p-5 overflow-y-auto bg-gray-900">
                         {messages.map((message) => (
                             <div
                                 key={message.id}
-                                className={`mb-4 ${message.isUser ? 'text-right' : 'text-left'}`}
+                                className={`mb-3 sm:mb-4 ${message.isUser ? 'text-right' : 'text-left'}`}
                             >
                                 <div
-                                    className={`inline-block px-4 py-3 rounded-2xl max-w-[85%] text-[15px] leading-relaxed ${
+                                    className={`inline-block px-3 py-2 sm:px-4 sm:py-3 rounded-2xl max-w-[90%] sm:max-w-[85%] text-sm sm:text-[15px] leading-relaxed ${
                                         message.isUser
-                                            ? 'bg-blue-600 text-white rounded-br-none shadow'
-                                            : 'bg-white text-gray-800 rounded-bl-none border border-gray-200 shadow'
+                                            ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-br-none shadow'
+                                            : 'bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700 shadow'
                                     }`}
                                 >
                                     {message.text}
                                 </div>
                                 <div
-                                    className={`text-xs text-gray-500 mt-1 ${
+                                    className={`text-xs text-gray-400 mt-1 ${
                                         message.isUser ? 'text-right' : 'text-left'
                                     }`}
                                 >
@@ -205,16 +205,16 @@ export default function Chatbot() {
                             </div>
                         ))}
                         {isLoading && (
-                            <div className="text-left mb-4">
-                                <div className="inline-block px-4 py-3 rounded-2xl bg-white border border-gray-200 shadow rounded-bl-none">
+                            <div className="text-left mb-3 sm:mb-4">
+                                <div className="inline-block px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-gray-800 border border-gray-700 shadow rounded-bl-none">
                                     <div className="flex space-x-1">
-                                        <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"></div>
+                                        <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-bounce"></div>
                                         <div
-                                            className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+                                            className="w-2.5 h-2.5 bg-green-400 rounded-full animate-bounce"
                                             style={{ animationDelay: '0.1s' }}
                                         ></div>
                                         <div
-                                            className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+                                            className="w-2.5 h-2.5 bg-green-400 rounded-full animate-bounce"
                                             style={{ animationDelay: '0.2s' }}
                                         ></div>
                                     </div>
@@ -225,25 +225,25 @@ export default function Chatbot() {
                     </div>
 
                     {/* Input */}
-                    <div className="p-4 border-t border-gray-200 bg-white">
+                    <div className="p-3 sm:p-4 border-t border-gray-700 bg-gray-800">
                         <div className="flex space-x-2">
                             <input
                                 type="text"
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}
                                 onKeyPress={handleKeyPress}
-                                placeholder="Nhập câu hỏi của bạn..."
-                                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-gray-500"
+                                placeholder="Nhập câu hỏi..."
+                                className="flex-1 px-3 py-2 sm:px-4 sm:py-2.5 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                                 disabled={isLoading}
                             />
                             <button
                                 onClick={sendMessage}
                                 disabled={isLoading || !inputMessage.trim()}
-                                className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center space-x-1"
+                                className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all text-sm font-medium flex items-center space-x-1"
                             >
-                                <span>Gửi</span>
+                                <span className="hidden sm:inline">Gửi</span>
                                 <svg
-                                    className="w-4 h-4"
+                                    className="w-4 h-4 sm:w-4 sm:h-4"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -257,7 +257,7 @@ export default function Chatbot() {
                                 </svg>
                             </button>
                         </div>
-                        <p className="text-xs text-gray-500 text-center mt-2">
+                        <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-1.5 sm:mt-2">
                             RiceLink Chatbot • Luôn sẵn sàng hỗ trợ bạn
                         </p>
                     </div>

@@ -177,7 +177,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="flex space-x-2 bg-gray-800 rounded-xl p-2 shadow-xl overflow-x-auto">
+        <div className="flex space-x-2 bg-gray-800 rounded-xl p-2 shadow-xl overflow-x-auto scrollbar-hide">
           {(
             [
               { k: "orders", label: "Quản lý đơn hàng" },
@@ -191,7 +191,7 @@ export default function AdminPage() {
             <button
               key={t.k}
               onClick={() => setTab(t.k)}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all whitespace-nowrap ${
+              className={`flex items-center space-x-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium transition-all whitespace-nowrap text-sm sm:text-base ${
                 tab === t.k
                   ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
                   : 'text-gray-300 hover:bg-gray-700'
@@ -533,17 +533,17 @@ export default function AdminPage() {
                     const statusConfig = getStatusConfig(o.status);
 
                     return (
-                      <div key={o.id} className="bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-700 hover:border-green-500 transition-all">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-3">
-                              <h3 className="text-xl font-bold text-gray-100">{o.clientName}</h3>
-                              <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-medium">
+                      <div key={o.id} className="bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-700 hover:border-green-500 transition-all">
+                        <div className="flex flex-col sm:flex-row items-start justify-between mb-4 gap-4">
+                          <div className="flex-1 w-full">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                              <h3 className="text-lg sm:text-xl font-bold text-gray-100">{o.clientName}</h3>
+                              <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs sm:text-sm font-medium w-fit">
                                 Số lượng: x{o.quantity}
                               </span>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                               {o.phoneNumber && (
                                 <div>
                                   <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Số điện thoại</p>
@@ -638,17 +638,17 @@ export default function AdminPage() {
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-700 gap-3">
                               <div>
                                 {o.servicePrice && o.clientCapacity && (
                                   <>
                                     <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tổng giá tiền</p>
-                                    <p className="text-2xl font-bold text-green-400">💵 {(o.servicePrice * o.clientCapacity +  o.clientCapacity * (o.pricePerKm ?? 0)).toLocaleString("vi-VN")} VNĐ</p>
+                                    <p className="text-xl sm:text-2xl font-bold text-green-400">💵 {(o.servicePrice * o.clientCapacity +  o.clientCapacity * (o.pricePerKm ?? 0)).toLocaleString("vi-VN")} VNĐ</p>
                                   </>
                                 )}
                               </div>
-                              
-                              <div className="text-right space-y-1">
+
+                              <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-1">
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
                               o.paymentStatus === 'paid'
                                 ? 'bg-green-500/20 text-green-400'
@@ -661,11 +661,11 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          <div className="flex flex-col items-end space-y-3 ml-6">
+                          <div className="flex sm:flex-col items-center sm:items-end gap-3 sm:gap-3 w-full sm:w-auto sm:ml-6">
                             <select
                               value={o.status}
                               disabled
-                              className={`px-4 py-2 rounded-lg font-medium text-sm border-2 bg-gray-800 cursor-pointer ${statusConfig.text} ${statusConfig.border}`}
+                              className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm border-2 bg-gray-800 cursor-pointer ${statusConfig.text} ${statusConfig.border}`}
                             >
                               <option value="pending">Chờ xử lý</option>
                               <option value="confirmed">Đã xác nhận</option>
