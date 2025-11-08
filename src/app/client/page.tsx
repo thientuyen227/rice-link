@@ -19,11 +19,12 @@ import {
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import Chatbot from "../components/Chatbot";
 
 type Order = {
   id: string;
   clientName: string;
-  phoneNumber: number;
+  phoneNumber: string;
   item: string;
   quantity: number;
   status: "pending" | "confirmed" | "completed" | "cancelled";
@@ -41,6 +42,8 @@ type Order = {
   deliveryDate?: string; // Ngày giao lúa
   deliveryTime?: string; // Giờ giao lúa
   paymentMethod?: string; // Phương thức thanh toán
+  pricePerKm?: number; // Giá tiền theo km
+  paymentStatus?: "paid" | "unpaid"; // Trạng thái thanh toán
 };
 
 const STORAGE_KEY = "orders";
@@ -129,6 +132,7 @@ export default function ClientPage() {
   const [hasShippingCompany, setHasShippingCompany] = useState(false);
   const [selectedShippingCompany, setSelectedShippingCompany] =
     useState<string>("");
+  const [pricePerKm, setPricePerKm] = useState<number>(0);
   const [shippingCompanies, setShippingCompanies] = useState<ShippingCompany[]>(
     []
   );
@@ -150,7 +154,7 @@ export default function ClientPage() {
       id: 1,
       name: 'Nhà máy sấy lúa SẤU THO',
       lastMessage: 'Chúng tôi đã nhận đơn hàng của bạn',
-      timestamp: '21:56',
+      timestamp: '09:56',
       unread: 0,
       avatar: '🏭'
     },
@@ -158,26 +162,10 @@ export default function ClientPage() {
       id: 2,
       name: 'HT Vận Tải Thủy Bộ',
       lastMessage: 'Xe sẽ đến lấy hàng vào 8h sáng mai',
-      timestamp: '20:15',
+      timestamp: '07:15',
       unread: 0,
       avatar: '🚚'
     },
-    {
-      id: 3,
-      name: 'Lò sấy An Giang 2',
-      lastMessage: 'Cảm ơn bạn đã sử dụng dịch vụ',
-      timestamp: '18:30',
-      unread: 0,
-      avatar: '🏭'
-    },
-    {
-      id: 4,
-      name: 'Hỗ trợ RiceLink',
-      lastMessage: 'Chúng tôi có thể giúp gì cho bạn?',
-      timestamp: '15:20',
-      unread: 0,
-      avatar: '💬'
-    }
   ];
 
   useEffect(() => {
@@ -239,6 +227,7 @@ export default function ClientPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900">
+      <Chatbot />
       {/* Header */}
       <header className="bg-gray-800 shadow-2xl border-b-4 border-green-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -334,7 +323,6 @@ export default function ClientPage() {
               <>
                 {sortedOrders.map((o) => {
                   const statusConfig = getStatusConfig(o.status);
-
                   return (
                     <div key={o.id} className="bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-700 hover:border-green-500 transition-all">
                       <div className="flex items-start justify-between mb-4">
@@ -345,8 +333,13 @@ export default function ClientPage() {
                               Số lượng: x{o.quantity}
                             </span>
                           </div>
-
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          {o.phoneNumber && (
+                            <div>
+                              <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Số điện thoại</p>
+                              <p className="text-gray-300">📞 {o.phoneNumber}</p>
+                            </div>
+                          )}
                             {o.clientAddress && (
                               <div>
                                 <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Địa chỉ khách hàng</p>
@@ -435,11 +428,18 @@ export default function ClientPage() {
                               {o.servicePrice && o.clientCapacity && (
                                 <>
                                   <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tổng giá tiền</p>
-                                  <p className="text-2xl font-bold text-green-400">💵 {(o.servicePrice * o.clientCapacity).toLocaleString("vi-VN")} VNĐ</p>
+                                  <p className="text-2xl font-bold text-green-400">💵 {(o.servicePrice * o.clientCapacity +  o.clientCapacity * (o.pricePerKm ?? 0)).toLocaleString("vi-VN")} VNĐ</p>
                                 </>
                               )}
                             </div>
-                            <div className="text-right">
+                            <div className="text-right space-y-1">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                o.paymentStatus === 'paid'
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-yellow-500/20 text-yellow-400'
+                              }`}>
+                                {o.paymentStatus === 'paid' ? '✅ Đã thanh toán' : '⏳ Chưa thanh toán'}
+                              </span>
                               <p className="text-xs text-gray-500">{new Date(o.createdAt).toLocaleString("vi-VN")}</p>
                             </div>
                           </div>
@@ -672,7 +672,7 @@ export default function ClientPage() {
                 {/* Capacity Type Dropdown */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Loại sản lượng
+                    Độ ẩm của lúa
                   </label>
                   <div className="relative">
                     <select
@@ -722,6 +722,7 @@ export default function ClientPage() {
                           setHasShippingCompany(e.target.checked);
                           if (e.target.checked) {
                             setSelectedShippingCompany("");
+                            setPricePerKm(0);
                           }
                         }}
                         className="sr-only"
@@ -748,7 +749,12 @@ export default function ClientPage() {
                     <div className="relative">
                       <select
                         value={selectedShippingCompany}
-                        onChange={(e) => setSelectedShippingCompany(e.target.value)}
+                        onChange={(e) => {
+                          setPricePerKm(
+                            shippingCompanies.find((c) => c.id === e.target.value)?.pricePerKm || 0
+                          );
+                          return setSelectedShippingCompany(e.target.value);
+                        }}
                         className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl appearance-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
                       >
                         <option value="">Chọn đơn vị...</option>
@@ -760,9 +766,6 @@ export default function ClientPage() {
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                     </div>
-                    <p className="mt-2 text-xs text-gray-400">
-                      Chọn lò trong danh sách gợi ý bên phải để hoàn tất đặt đơn.
-                    </p>
                   </div>
                 )}
 
@@ -776,7 +779,7 @@ export default function ClientPage() {
                     value={deliveryDate}
                     onChange={(e) => setDeliveryDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all [color-scheme:dark]"
                   />
                 </div>
 
@@ -828,6 +831,9 @@ export default function ClientPage() {
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
+                <p className="mt-2 text-xs text-gray-400">
+                      Chọn lò trong danh sách gợi ý bên phải để hoàn tất đặt đơn.
+                    </p>
               </div>
             </div>
 
@@ -883,7 +889,7 @@ export default function ClientPage() {
                   const newOrder: Order = {
                     id: crypto.randomUUID(),
                     clientName: clientName.trim(),
-                    phoneNumber: Number(phoneNumber.trim()),
+                    phoneNumber: phoneNumber.trim(),
                     item: `${serviceTypeText} ${capacity} Tấn · ${shopName}`,
                     quantity: 1,
                     status: "pending",
@@ -899,6 +905,7 @@ export default function ClientPage() {
                     deliveryDate: deliveryDate,
                     deliveryTime: deliveryTime,
                     paymentMethod: paymentMethod,
+                    pricePerKm: hasShippingCompany ? 0 : pricePerKm,
                   };
                   setOrders((prev) => [newOrder, ...prev]);
                   setClientName("");

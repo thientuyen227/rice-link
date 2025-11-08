@@ -34,6 +34,8 @@ type Order = {
   deliveryDate?: string; // Ngày giao lúa
   deliveryTime?: string; // Giờ giao lúa
   paymentMethod?: string; // Phương thức thanh toán
+  pricePerKm?: number; // Giá tiền theo km
+  paymentStatus?: "paid" | "unpaid"; // Trạng thái thanh toán
 };
 
 const ORDERS_KEY = "orders";
@@ -135,16 +137,6 @@ export default function AdminPage() {
     price: string;
     rating: number;
   } | null>(null);
-
-  // Mock transport companies
-  const transportCompanies = ["HT Vận Tải Thủy Bộ", "Vận Tải Đồng Tháp", "Logistics An Giang"];
-
-  // Mock drying points
-  const dryingPoints = [
-    { id: 1, name: "Nhà máy sấy lúa SẤU THO", lat: 10.45, lng: 105.62, price: "500.000 VNĐ/tấn", rating: 4.8 },
-    { id: 2, name: "Lò sấy An Giang 2", lat: 10.52, lng: 105.58, price: "480.000 VNĐ/tấn", rating: 4.5 },
-    { id: 3, name: "Cơ sở sấy Đồng Tháp", lat: 10.48, lng: 105.65, price: "520.000 VNĐ/tấn", rating: 4.7 },
-  ];
 
   useEffect(() => {
     // Only run on client side to avoid hydration mismatch
@@ -657,7 +649,7 @@ export default function AdminPage() {
                                 {o.servicePrice && o.clientCapacity && (
                                   <>
                                     <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tổng giá tiền</p>
-                                    <p className="text-2xl font-bold text-green-400">💵 {(o.servicePrice * (o.clientCapacity / 1000)).toLocaleString("vi-VN")} VNĐ</p>
+                                    <p className="text-2xl font-bold text-green-400">💵 {(o.servicePrice * o.clientCapacity +  o.clientCapacity * (o.pricePerKm ?? 0)).toLocaleString("vi-VN")} VNĐ</p>
                                   </>
                                 )}
                               </div>
@@ -953,10 +945,7 @@ export default function AdminPage() {
                       ? (order.servicePrice * order.clientCapacity).toLocaleString("vi-VN") + " VNĐ"
                       : "N/A";
 
-                    const paymentStatus =
-                      order.status === 'completed' ? 'Đã thanh toán' :
-                      order.status === 'confirmed' ? 'Chờ xác nhận' :
-                      order.status === 'cancelled' ? 'Hủy' : 'Chờ xác nhận';
+                    const paymentStatus = order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán';
 
                     const paymentMethodDisplay =
                       order.paymentMethod === 'cash' ? 'Tiền mặt' :
@@ -987,18 +976,24 @@ export default function AdminPage() {
                           <div className="text-sm font-semibold text-gray-100">{totalAmount}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            paymentStatus === 'Đã thanh toán'
-                              ? 'bg-green-500/20 text-green-400'
-                              : paymentStatus === 'Chờ xác nhận'
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {paymentStatus === 'Đã thanh toán' && '✅ '}
-                            {paymentStatus === 'Chờ xác nhận' && '⏳ '}
-                            {paymentStatus === 'Hủy' && '❌ '}
-                            {paymentStatus}
-                          </span>
+                          <select
+                            value={order.paymentStatus || 'unpaid'}
+                            onChange={(e) => {
+                              const updatedOrders = orders.map(o =>
+                                o.id === order.id ? { ...o, paymentStatus: e.target.value as "paid" | "unpaid" } : o
+                              );
+                              saveOrders(updatedOrders);
+                              setOrders(updatedOrders);
+                            }}
+                            className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer border-0 ${
+                              paymentStatus === 'Đã thanh toán'
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-yellow-500/20 text-yellow-400'
+                            }`}
+                          >
+                            <option value="unpaid">⏳ Chưa thanh toán</option>
+                            <option value="paid">✅ Đã thanh toán</option>
+                          </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium ${
@@ -1028,14 +1023,14 @@ export default function AdminPage() {
           </div>
 
           {/* Payment Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
             <div className="bg-gray-800 rounded-xl shadow-xl p-6 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-400 mb-1">Đã thanh toán</p>
                   <p className="text-2xl font-bold text-green-400">
                     {orders
-                      .filter(o => o.status === 'completed' && o.servicePrice && o.clientCapacity)
+                      .filter(o => o.paymentStatus === 'paid' && o.servicePrice && o.clientCapacity)
                       .reduce((sum, o) => sum + (o.servicePrice! * o.clientCapacity!), 0)
                       .toLocaleString("vi-VN")} VNĐ
                   </p>
@@ -1046,10 +1041,10 @@ export default function AdminPage() {
             <div className="bg-gray-800 rounded-xl shadow-xl p-6 border-l-4 border-yellow-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400 mb-1">Chờ xác nhận</p>
+                  <p className="text-sm text-gray-400 mb-1">Chờ thanh toán</p>
                   <p className="text-2xl font-bold text-yellow-400">
                     {orders
-                      .filter(o => (o.status === 'pending' || o.status === 'confirmed') && o.servicePrice && o.clientCapacity)
+                      .filter(o => (o.paymentStatus === 'unpaid' || o.status === 'confirmed') && o.servicePrice && o.clientCapacity)
                       .reduce((sum, o) => sum + (o.servicePrice! * o.clientCapacity!), 0)
                       .toLocaleString("vi-VN")} VNĐ
                   </p>
@@ -1057,20 +1052,7 @@ export default function AdminPage() {
                 <div className="text-4xl">⏳</div>
               </div>
             </div>
-            <div className="bg-gray-800 rounded-xl shadow-xl p-6 border-l-4 border-red-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Đã hủy</p>
-                  <p className="text-2xl font-bold text-red-400">
-                    {orders
-                      .filter(o => o.status === 'cancelled' && o.servicePrice && o.clientCapacity)
-                      .reduce((sum, o) => sum + (o.servicePrice! * o.clientCapacity!), 0)
-                      .toLocaleString("vi-VN")} VNĐ
-                  </p>
-                </div>
-                <div className="text-4xl">❌</div>
-              </div>
-            </div>
+            
           </div>
         </div>
       )}

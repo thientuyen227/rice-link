@@ -77,6 +77,11 @@ export default function MapClient(props: BookingProps = {}) {
     }[]
   >([]);
 
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    shop: any;
+  } | null>(null);
+
   const ROUTES_SOURCE_ID = "routes-source";
   const ROUTES_LAYER_ID = "routes-layer";
   const ROUTES_LAYER_SHORTEST_ID = "routes-layer-shortest";
@@ -531,24 +536,7 @@ export default function MapClient(props: BookingProps = {}) {
                       return;
                     }
 
-                    const confirmed = window.confirm(
-                      `Bạn có muốn chọn lò sấy "${s.name}" không?\n\n` +
-                      `Khoảng cách: ${(s.distance / 1000).toFixed(1)} km\n` +
-                      `Công suất: ${s.capacity} Tấn\n` +
-                      `Giá sấy: ${(s.dryingPrice || 0).toLocaleString("vi-VN")} VND/Tấn\n` +
-                      `Giá sấy + bảo quản: ${(s.dryingAndStoragePrice || 0).toLocaleString("vi-VN")} VND/Tấn`
-                    );
-                    if (confirmed) {
-                      props.onSelectShop?.(
-                        s.name,
-                        addressText,
-                        Number(customerCapacity),
-                        {
-                          dryingPrice: s.dryingPrice,
-                          dryingAndStoragePrice: s.dryingAndStoragePrice,
-                        }
-                      );
-                    }
+                    setConfirmDialog({ show: true, shop: s });
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -579,6 +567,60 @@ export default function MapClient(props: BookingProps = {}) {
           )}
         </div>
       </div>
+
+      {/* Custom Confirmation Dialog */}
+      {confirmDialog?.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Bạn có muốn chọn lò sấy "<span className="font-bold">{confirmDialog.shop.name}</span>" không?
+            </h3>
+            <div className="space-y-2 text-sm text-gray-700 mb-6">
+              <div>
+                <span className="font-medium">Khoảng cách:</span>{" "}
+                {(confirmDialog.shop.distance / 1000).toFixed(1)} km
+              </div>
+              <div>
+                <span className="font-medium">Công suất:</span>{" "}
+                {confirmDialog.shop.capacity} Tấn
+              </div>
+              <div>
+                <span className="font-medium">Giá sấy:</span>{" "}
+                {(confirmDialog.shop.dryingPrice || 0).toLocaleString("vi-VN")} VND/Tấn
+              </div>
+              <div>
+                <span className="font-medium">Giá sấy + bảo quản:</span>{" "}
+                {(confirmDialog.shop.dryingAndStoragePrice || 0).toLocaleString("vi-VN")} VND/Tấn
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  props.onSelectShop?.(
+                    confirmDialog.shop.name,
+                    addressText,
+                    Number(customerCapacity),
+                    {
+                      dryingPrice: confirmDialog.shop.dryingPrice,
+                      dryingAndStoragePrice: confirmDialog.shop.dryingAndStoragePrice,
+                    }
+                  );
+                  setConfirmDialog(null);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors"
+              >
+                Đồng ý
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

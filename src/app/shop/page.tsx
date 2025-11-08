@@ -25,6 +25,8 @@ type Order = {
   deliveryDate?: string; // Ngày giao lúa
   deliveryTime?: string; // Giờ giao lúa
   paymentMethod?: string; // Phương thức thanh toán
+  pricePerKm?: number; // Giá tiền theo km
+  paymentStatus?: "paid" | "unpaid"; // Trạng thái thanh toán
 };
 
 const STORAGE_KEY = "orders";
@@ -324,7 +326,7 @@ export default function ShopPage() {
                           {o.clientCapacity && (
                             <div>
                               <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Sản lượng khách hàng</p>
-                              <p className="text-gray-300 font-semibold">{(o.clientCapacity / 1000).toFixed(2)} Tấn</p>
+                              <p className="text-gray-300 font-semibold">{o.clientCapacity} Tấn</p>
                             </div>
                           )}
                           {o.shopName && (
@@ -398,11 +400,18 @@ export default function ShopPage() {
                             {o.servicePrice && o.clientCapacity && (
                               <>
                                 <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tổng giá tiền</p>
-                                <p className="text-2xl font-bold text-green-400">💵 {(o.servicePrice * (o.clientCapacity / 1000)).toLocaleString("vi-VN")} VNĐ</p>
+                                <p className="text-2xl font-bold text-green-400">💵 {(o.servicePrice * o.clientCapacity +  o.clientCapacity * (o.pricePerKm ?? 0)).toLocaleString("vi-VN")} VNĐ</p>
                               </>
                             )}
                           </div>
-                          <div className="text-right">
+                          <div className="text-right space-y-1">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                              o.paymentStatus === 'paid'
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {o.paymentStatus === 'paid' ? '✅ Đã thanh toán' : '⏳ Chưa thanh toán'}
+                            </span>
                             <p className="text-xs text-gray-500">{new Date(o.createdAt).toLocaleString("vi-VN")}</p>
                           </div>
                         </div>
