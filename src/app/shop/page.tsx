@@ -345,6 +345,14 @@ export default function ShopPage() {
                               </p>
                             </div>
                           )}
+                          {o.pricePerKm && (
+                                <div>
+                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Giá vận chuyển</p>
+                                  <p className="text-yellow-400 font-bold">
+                                  💰 {o.pricePerKm.toLocaleString("vi-VN")} VND/Tấn
+                                  </p>
+                                </div>
+                              )}
                           {o.serviceType && (
                             <div>
                               <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Loại dịch vụ</p>

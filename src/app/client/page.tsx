@@ -373,6 +373,14 @@ export default function ClientPage() {
                                 </p>
                               </div>
                             )}
+                            {o.pricePerKm && (
+                                <div>
+                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Giá vận chuyển</p>
+                                  <p className="text-yellow-400 font-bold">
+                                  💰 {o.pricePerKm.toLocaleString("vi-VN")} VND/Tấn
+                                  </p>
+                                </div>
+                              )}
                             {o.serviceType && (
                               <div>
                                 <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Loại dịch vụ</p>
@@ -795,6 +803,13 @@ export default function ClientPage() {
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl appearance-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                     >
                       <option value="">Chọn khung giờ...</option>
+                      <option value="0-1">0:00 - 1:00</option>
+                      <option value="1-2">1:00 - 2:00</option>
+                      <option value="2-3">2:00 - 3:00</option>
+                      <option value="3-4">3:00 - 4:00</option>
+                      <option value="4-5">4:00 - 5:00</option>
+                      <option value="5-6">5:00 - 6:00</option>
+                      <option value="6-7">6:00 - 7:00</option>
                       <option value="7-8">7:00 - 8:00</option>
                       <option value="8-9">8:00 - 9:00</option>
                       <option value="9-10">9:00 - 10:00</option>
@@ -805,6 +820,12 @@ export default function ClientPage() {
                       <option value="15-16">15:00 - 16:00</option>
                       <option value="16-17">16:00 - 17:00</option>
                       <option value="17-18">17:00 - 18:00</option>
+                      <option value="18-19">18:00 - 19:00</option>
+                      <option value="19-20">19:00 - 20:00</option>
+                      <option value="20-21">20:00 - 21:00</option>
+                      <option value="21-22">21:00 - 22:00</option>
+                      <option value="22-23">22:00 - 23:00</option>
+                      <option value="23-24">23:00 - 24:00</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>

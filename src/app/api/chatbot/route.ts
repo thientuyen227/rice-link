@@ -12,6 +12,11 @@ export async function POST(request: NextRequest) {
         }
 
         if (!process.env.DIALOGFLOW_PROJECT_ID || !process.env.DIALOGFLOW_CLIENT_EMAIL || !process.env.DIALOGFLOW_PRIVATE_KEY) {
+            console.error('Missing Dialogflow env vars:', {
+                hasProjectId: !!process.env.DIALOGFLOW_PROJECT_ID,
+                hasClientEmail: !!process.env.DIALOGFLOW_CLIENT_EMAIL,
+                hasPrivateKey: !!process.env.DIALOGFLOW_PRIVATE_KEY,
+            });
             throw new Error('Dialogflow configuration is missing');
         }
 
@@ -56,9 +61,9 @@ export async function POST(request: NextRequest) {
 
         // Fallback responses cho testing
         const fallbackResponses = [
-            "Xin chào! Tôi là trợ lý RiceLink. Tôi có thể giúp gì cho bạn về các sản phẩm gạo?",
-            "Hiện tại tôi đang được nâng cấp. Bạn có thể hỏi tôi về các cửa hàng gạo hoặc sản phẩm!",
-            "Tôi có thể giúp bạn tìm thông tin về cơ chế bảo đảm và giới thiệu sản phẩm.",
+            "Xin chào! Tôi là trợ lý RiceLink. Tôi có thể giúp gì cho bạn về dịch vụ sấy lúa?",
+            "Hiện tại tôi đang được nâng cấp. Bạn có thể hỏi tôi về các lò sấy hoặc đơn vị vận chuyển!",
+            "Tôi có thể giúp bạn tìm thông tin về giá sấy lúa và các dịch vụ liên quan.",
         ];
 
         const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
@@ -66,6 +71,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             reply: randomResponse,
             fallback: true,
+            error: error instanceof Error ? error.message : 'Unknown error',
             timestamp: new Date().toISOString()
         });
     }

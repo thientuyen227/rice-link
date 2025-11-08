@@ -503,7 +503,7 @@ export default function MapClient(props: BookingProps = {}) {
                 value={customerCapacity}
                 onChange={(e) => setCustomerCapacity(e.target.value)}
                 placeholder="Công suất (Tấn/ngày)"
-                className="px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm w-[180px]"
+                className="px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm w-[190px]"
               />
               <button
                 type="submit"

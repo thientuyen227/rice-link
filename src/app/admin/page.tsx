@@ -561,7 +561,7 @@ export default function AdminPage() {
                               {o.clientCapacity && (
                                 <div>
                                   <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Sản lượng khách hàng</p>
-                                  <p className="text-gray-300 font-semibold">{(o.clientCapacity / 1000).toFixed(2)} Tấn</p>
+                                  <p className="text-gray-300 font-semibold">{o.clientCapacity} Tấn</p>
                                 </div>
                               )}
                               {o.shopName && (
@@ -577,6 +577,14 @@ export default function AdminPage() {
                                   <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Đơn vị vận chuyển</p>
                                   <p className="text-white flex items-center text-sm">
                                     🚚 {o.shippingCompany}
+                                  </p>
+                                </div>
+                              )}
+                              {o.pricePerKm && (
+                                <div>
+                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Giá vận chuyển</p>
+                                  <p className="text-yellow-400 font-bold">
+                                  💰 {o.pricePerKm.toLocaleString("vi-VN")} VND/Tấn
                                   </p>
                                 </div>
                               )}
@@ -657,12 +665,6 @@ export default function AdminPage() {
                             <select
                               value={o.status}
                               disabled
-                              // onChange={(e) => {
-                              //   const newStatus = e.target.value as Order["status"];
-                              //   setOrders((prev) => prev.map((order) =>
-                              //     order.id === o.id ? { ...order, status: newStatus } : order
-                              //   ));
-                              // }}
                               className={`px-4 py-2 rounded-lg font-medium text-sm border-2 bg-gray-800 cursor-pointer ${statusConfig.text} ${statusConfig.border}`}
                             >
                               <option value="pending">Chờ xử lý</option>
@@ -936,7 +938,7 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-gray-700">
                   {orders.map((order) => {
                     const totalAmount = order.servicePrice && order.clientCapacity
-                      ? (order.servicePrice * order.clientCapacity).toLocaleString("vi-VN") + " VNĐ"
+                      ? (order.servicePrice * order.clientCapacity + order.clientCapacity * (order.pricePerKm ?? 0)).toLocaleString("vi-VN") + " VNĐ"
                       : "N/A";
 
                     const paymentStatus = order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán';
