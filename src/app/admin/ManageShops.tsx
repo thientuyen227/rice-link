@@ -32,7 +32,6 @@ export default function ManageShops() {
       Rating: 0,
       LimitCapacity: 0,
       "Giá sấy lúa": 0,
-      "Giá sấy và bảo quản lúa": 0,
       username: "",
       password: "",
     });
@@ -226,23 +225,6 @@ export default function ManageShops() {
                     value={formData["Giá sấy lúa"] || 0}
                     onChange={(e) =>
                       handleInputChange("Giá sấy lúa", Number(e.target.value))
-                    }
-                    className="w-full border rounded px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Giá sấy và bảo quản (VNĐ/tấn)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData["Giá sấy và bảo quản lúa"] || 0}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "Giá sấy và bảo quản lúa",
-                        Number(e.target.value)
-                      )
                     }
                     className="w-full border rounded px-3 py-2"
                   />

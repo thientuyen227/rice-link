@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import shopsData, { ShopData } from "@/data/shop";
+import { ShopData } from "@/data/shop";
 import { db } from "@/data/fakeDb";
 
 interface AuthContextType {
@@ -18,19 +18,32 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Local type for records from fakeDb
+interface ShopRecord {
+  id?: string;
+  name?: string;
+  district?: string;
+  address?: string;
+  coordinates?: [number, number];
+  rating?: number;
+  limitCapacity?: number;
+  dryingPrice?: number;
+  username?: string;
+  password?: string;
+}
+
 // Convert ShopRecord from fakeDb to ShopData format
-function convertShopRecordToShopData(shopRecord: any): ShopData {
+function convertShopRecordToShopData(shopRecord: ShopRecord): ShopData {
   return {
     STT: 0,
     id: shopRecord.id,
-    "Tên lò sấy": shopRecord.name,
+    "Tên lò sấy": shopRecord.name || "",
     "TP/Huyện": shopRecord.district || "",
     "Địa điểm": shopRecord.address || "",
     "Tọa độ": shopRecord.coordinates || [0, 0],
     Rating: shopRecord.rating || 0,
     LimitCapacity: shopRecord.limitCapacity || 0,
     "Giá sấy lúa": shopRecord.dryingPrice || 0,
-    "Giá sấy và bảo quản lúa": shopRecord.dryingAndStoragePrice || 0,
     username: shopRecord.username || "",
     password: shopRecord.password || "",
   };
@@ -119,7 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         district: updated["TP/Huyện"],
         limitCapacity: updated.LimitCapacity,
         dryingPrice: updated["Giá sấy lúa"],
-        dryingAndStoragePrice: updated["Giá sấy và bảo quản lúa"],
         username: updated.username,
         password: updated.password,
       });
@@ -142,7 +154,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       rating: shop.Rating,
       limitCapacity: shop.LimitCapacity,
       dryingPrice: shop["Giá sấy lúa"],
-      dryingAndStoragePrice: shop["Giá sấy và bảo quản lúa"],
       username: shop.username,
       password: shop.password,
     });

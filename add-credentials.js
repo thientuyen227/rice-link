@@ -27,7 +27,7 @@ const credentials = [
 
 credentials.forEach(({ stt, username, password }) => {
   const pattern = new RegExp(
-    `(STT: ${stt},[\\s\\S]*?"Giá sấy và bảo quản lúa": \\d+,)\\n(\\s*)(})`,
+    `(STT: ${stt},[\\s\\S]*?"Giá sấy lúa": \\d+,)\\n(\\s*)(})`,
     'g'
   );
 
