@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fix Orders - RiceLink</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d5016 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #4ade80;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        .section {
+            background: #1a1a1a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4ade80;
+        }
+        button {
+            background: #4ade80;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #22c55e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+        }
+        button.danger {
+            background: #ef4444;
+            color: #fff;
+        }
+        button.danger:hover {
+            background: #dc2626;
+        }
+        .info-box {
+            background: #1e40af20;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .success-box {
+            background: #15803d20;
+            border: 1px solid #22c55e;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .warning-box {
+            background: #92400e20;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .error-box {
+            background: #7f1d1d20;
+            border: 1px solid #ef4444;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        pre {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background: #333;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #333;
+        }
+        .shop-name {
+            font-weight: bold;
+            color: #fbbf24;
+        }
+        .status-ok {
+            color: #22c55e;
+        }
+        .status-error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Orders - RiceLink</h1>
+        <p class="subtitle">Tool để sửa tên shop trong orders cho đúng với database</p>
+
+        <div class="section">
+            <h2>📊 Tình trạng hiện tại</h2>
+            <div id="current-status"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 Phân tích Orders</h2>
+            <div id="analysis"></div>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ Actions</h2>
+            <button onclick="analyzeOrders()">🔄 Refresh Analysis</button>
+            <button onclick="fixAllOrders()" class="success">✅ Fix All Orders</button>
+            <button onclick="clearOrders()" class="danger">🗑️ Clear All Orders</button>
+            <button onclick="exportOrders()">📥 Export Orders</button>
+        </div>
+
+        <div class="section">
+            <h2>📝 Log</h2>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Correct shop names from database
+        const CORRECT_SHOP_NAMES = [
+            "Nhà máy sấy lúa SÁU THO",
+            "Cơ sở sấy lúa Lệ Hoa",
+            "Cơ sở sấy - Nhà máy Lộc Tấn",
+            "Cơ sở sấy lúa Kim Oanh"
+        ];
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString('vi-VN');
+            const colors = {
+                info: '#3b82f6',
+                success: '#22c55e',
+                warning: '#f59e0b',
+                error: '#ef4444'
+            };
+            logDiv.innerHTML = `<div style="color: ${colors[type]}; margin: 5px 0;">[${timestamp}] ${message}</div>` + logDiv.innerHTML;
+        }
+
+        function analyzeOrders() {
+            log('🔍 Analyzing orders...', 'info');
+
+            const ordersRaw = localStorage.getItem('orders');
+            const orders = ordersRaw ? JSON.parse(ordersRaw) : [];
+
+            log(`📦 Found ${orders.length} orders in localStorage`, 'info');
+
+            // Status
+            const statusDiv = document.getElementById('current-status');
+            statusDiv.innerHTML = `
+                <div class="info-box">
+                    <p><strong>Total Orders:</strong> ${orders.length}</p>
+                    <p><strong>Correct Shop Names:</strong></p>
+                    <ul>
+                        ${CORRECT_SHOP_NAMES.map(name => `<li class="shop-name">${name}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+
+            // Analysis
+            const analysisDiv = document.getElementById('analysis');
+            let html = '<table><tr><th>Order ID</th><th>Client</th><th>Shop Name</th><th>Status</th><th>Action Needed</th></tr>';
+
+            let needsFixCount = 0;
+            let okCount = 0;
+
+            orders.forEach(order => {
+                const shopName = order.shopName || '';
+                const isCorrect = CORRECT_SHOP_NAMES.includes(shopName);
+                const matchedShop = findBestMatch(shopName);
+
+                if (!isCorrect) needsFixCount++;
+                else okCount++;
+
+                html += `
+                    <tr>
+                        <td style="font-size: 10px;">${order.id.substring(0, 12)}...</td>
+                        <td>${order.clientName || 'N/A'}</td>
+                        <td class="shop-name">${shopName}</td>
+                        <td class="${isCorrect ? 'status-ok' : 'status-error'}">
+                            ${isCorrect ? '✅ OK' : '❌ Needs Fix'}
+                        </td>
+                        <td>
+                            ${!isCorrect && matchedShop ? `Fix to: <span class="shop-name">${matchedShop}</span>` : '-'}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</table>';
+
+            if (needsFixCount > 0) {
+                html = `<div class="warning-box">
+                    <p><strong>⚠️ Found ${needsFixCount} order(s) that need fixing!</strong></p>
+                    <p>${okCount} order(s) are already correct.</p>
+                </div>` + html;
+                log(`⚠️ Found ${needsFixCount} orders that need fixing`, 'warning');
+            } else if (orders.length > 0) {
+                html = `<div class="success-box">
+                    <p><strong>✅ All ${okCount} orders have correct shop names!</strong></p>
+                </div>` + html;
+                log('✅ All orders are correct', 'success');
+            } else {
+                html = `<div class="info-box"><p>No orders found in localStorage.</p></div>`;
+                log('ℹ️ No orders found', 'info');
+            }
+
+            analysisDiv.innerHTML = html;
+        }
+
+        function findBestMatch(shopName) {
+            if (!shopName) return null;
+
+            // Exact match
+            if (CORRECT_SHOP_NAMES.includes(shopName)) return shopName;
+
+            // Case insensitive
+            const lowerName = shopName.toLowerCase();
+            for (const correct of CORRECT_SHOP_NAMES) {
+                if (correct.toLowerCase() === lowerName) return correct;
+            }
+
+            // Trim match
+            const trimName = shopName.trim();
+            for (const correct of CORRECT_SHOP_NAMES) {
+                if (correct.trim() === trimName) return correct;
+            }
+
+            // Partial match
+            for (const correct of CORRECT_SHOP_NAMES) {
+                if (correct.includes(shopName) || shopName.includes(correct)) return correct;
+            }
+
+            // Fuzzy match - check if similar
+            for (const correct of CORRECT_SHOP_NAMES) {
+                if (calculateSimilarity(shopName, correct) > 0.7) return correct;
+            }
+
+            return null;
+        }
+
+        function calculateSimilarity(str1, str2) {
+            const longer = str1.length > str2.length ? str1 : str2;
+            const shorter = str1.length > str2.length ? str2 : str1;
+            const longerLength = longer.length;
+            if (longerLength === 0) return 1.0;
+            return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+        }
+
+        function editDistance(str1, str2) {
+            str1 = str1.toLowerCase();
+            str2 = str2.toLowerCase();
+            const costs = [];
+            for (let i = 0; i <= str1.length; i++) {
+                let lastValue = i;
+                for (let j = 0; j <= str2.length; j++) {
+                    if (i === 0) costs[j] = j;
+                    else if (j > 0) {
+                        let newValue = costs[j - 1];
+                        if (str1.charAt(i - 1) !== str2.charAt(j - 1))
+                            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                        costs[j - 1] = lastValue;
+                        lastValue = newValue;
+                    }
+                }
+                if (i > 0) costs[str2.length] = lastValue;
+            }
+            return costs[str2.length];
+        }
+
+        function fixAllOrders() {
+            if (!confirm('Bạn có chắc muốn fix tất cả orders? Thao tác này sẽ thay đổi tên shop trong orders cho đúng với database.')) {
+                return;
+            }
+
+            log('🔧 Starting to fix orders...', 'info');
+
+            const ordersRaw = localStorage.getItem('orders');
+            const orders = ordersRaw ? JSON.parse(ordersRaw) : [];
+
+            let fixedCount = 0;
+            const updatedOrders = orders.map(order => {
+                const shopName = order.shopName || '';
+                const isCorrect = CORRECT_SHOP_NAMES.includes(shopName);
+
+                if (!isCorrect) {
+                    const matchedShop = findBestMatch(shopName);
+                    if (matchedShop) {
+                        log(`🔧 Fixing order ${order.id.substring(0, 8)}...: "${shopName}" → "${matchedShop}"`, 'warning');
+                        fixedCount++;
+                        return { ...order, shopName: matchedShop };
+                    }
+                }
+
+                return order;
+            });
+
+            localStorage.setItem('orders', JSON.stringify(updatedOrders));
+            log(`✅ Fixed ${fixedCount} order(s)!`, 'success');
+
+            // Refresh analysis
+            setTimeout(() => {
+                analyzeOrders();
+                alert(`✅ Successfully fixed ${fixedCount} order(s)!\n\nPlease refresh the shop and admin pages to see the changes.`);
+            }, 500);
+        }
+
+        function clearOrders() {
+            if (!confirm('⚠️ WARNING: This will DELETE ALL ORDERS!\n\nAre you absolutely sure?')) {
+                return;
+            }
+
+            if (!confirm('⚠️ FINAL WARNING: This cannot be undone!\n\nClick OK to proceed.')) {
+                return;
+            }
+
+            localStorage.removeItem('orders');
+            log('🗑️ All orders have been cleared', 'warning');
+            analyzeOrders();
+            alert('All orders have been deleted!');
+        }
+
+        function exportOrders() {
+            const ordersRaw = localStorage.getItem('orders');
+            const orders = ordersRaw ? JSON.parse(ordersRaw) : [];
+
+            const dataStr = JSON.stringify(orders, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `orders-backup-${Date.now()}.json`;
+            link.click();
+
+            log('📥 Orders exported successfully', 'success');
+        }
+
+        // Initial analysis
+        analyzeOrders();
+
+        // Auto refresh every 5 seconds
+        setInterval(analyzeOrders, 5000);
+    </script>
+</body>
+</html>
+

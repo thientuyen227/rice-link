@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Debug</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: monospace;
+            padding: 20px;
+        }
+        .section {
+            background: #1e293b;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+        }
+        pre {
+            background: #020617;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        .warning { color: #fbbf24; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Quick Debug - Shop Orders</h1>
+    <div class="section">
+        <h2>Current Shop Info (from localStorage)</h2>
+        <pre id="shopInfo"></pre>
+    </div>
+    <div class="section">
+        <h2>Orders Data</h2>
+        <pre id="ordersData"></pre>
+    </div>
+    <div class="section">
+        <h2>Analysis</h2>
+        <div id="analysis"></div>
+    </div>
+    <script>
+        // Get current shop
+        const shopName = localStorage.getItem('currentShopName');
+        document.getElementById('shopInfo').textContent = JSON.stringify({
+            currentShopName: shopName
+        }, null, 2);
+
+        // Get orders
+        const ordersStr = localStorage.getItem('orders');
+        const orders = ordersStr ? JSON.parse(ordersStr) : [];
+        document.getElementById('ordersData').textContent = JSON.stringify(orders, null, 2);
+
+        // Analysis
+        let html = '<ul>';
+        html += '<li>Total orders: ' + orders.length + '</li>';
+        html += '<li>Current shop name: <span class="warning">' + (shopName || 'NOT SET') + '</span></li>';
+
+        orders.forEach((order, i) => {
+            html += '<li>Order ' + (i+1) + ':';
+            html += '<ul>';
+            html += '<li>ID: ' + order.id + '</li>';
+            html += '<li>shopId: <span class="' + (order.shopId ? 'success' : 'error') + '">' + (order.shopId || 'MISSING') + '</span></li>';
+            html += '<li>shopName: ' + (order.shopName || 'N/A') + '</li>';
+            html += '<li>Client: ' + order.clientName + '</li>';
+            html += '</ul>';
+            html += '</li>';
+        });
+        html += '</ul>';
+
+        document.getElementById('analysis').innerHTML = html;
+
+        // Log to console
+        console.log('🔍 DEBUG INFO:');
+        console.log('Current Shop Name:', shopName);
+        console.log('Orders:', orders);
+        console.log('Orders with shopId:', orders.filter(o => o.shopId).length);
+    </script>
+</body>
+</html>
+

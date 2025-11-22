@@ -1,6 +1,7 @@
 const shops: ShopData[] = [
   {
     STT: 1,
+    id: "shop-sautho",
     "Tên lò sấy": "Nhà máy sấy lúa SÁU THO",
     "TP/Huyện": "Huyện Thanh Bình",
     "Địa điểm": "HC4X+F42, Unnamed Road, Thanh Bình, Đồng Tháp, Việt Nam",
@@ -9,21 +10,27 @@ const shops: ShopData[] = [
     LimitCapacity: 1196,
     "Giá sấy lúa": 150000,
     "Giá sấy và bảo quản lúa": 360000,
+    username: "sautho",
+    password: "123456a",
   },
   {
     STT: 2,
-    "Tên lò sấy": "Lò sấy lúa Lệ Hoa",
+    id: "shop-lehoa",
+    "Tên lò sấy": "Cơ sở sấy lúa Lệ Hoa",
     "TP/Huyện": "Huyện Lấp Vò",
     "Địa điểm": "227B ấp Hưng Quới 2, Long Hưng A, Lấp Vò, Đồng Tháp, Việt Nam",
     "Tọa độ": [10.35836428631044, 105.65841131617583],
     Rating: 3.7,
     LimitCapacity: 916,
+    username: "lehoa",
+    password: "123456b",
     "Giá sấy lúa": 160000,
     "Giá sấy và bảo quản lúa": 380000,
   },
   {
     STT: 3,
-    "Tên lò sấy": "Lò Sấy - Nhà máy Lộc Tấn",
+    id: "shop-loctan",
+    "Tên lò sấy": "Cơ sở sấy - Nhà máy Lộc Tấn",
     "TP/Huyện": "Huyện Lấp Vò",
     "Địa điểm": "Cầu Lấp Vò, Long Hưng B, Lấp Vò, Đồng Tháp, Việt Nam",
     "Tọa độ": [10.332491684249048, 105.63654236252094],
@@ -31,10 +38,13 @@ const shops: ShopData[] = [
     LimitCapacity: 522,
     "Giá sấy lúa": 165000,
     "Giá sấy và bảo quản lúa": 400000,
+    username: "loctan",
+    password: "123456c",
   },
   {
     STT: 4,
-    "Tên lò sấy": "Lò Sấy lúa Kim Oanh",
+    id: "shop-kimoanh",
+    "Tên lò sấy": "Cơ sở sấy lúa Kim Oanh",
     "TP/Huyện": "Huyện Lấp Vò",
     "Địa điểm":
       "207A ấp Hưng Thành Tây, Long Hưng A, Lấp Vò, Đồng Tháp, Việt Nam",
@@ -43,10 +53,13 @@ const shops: ShopData[] = [
     LimitCapacity: 635,
     "Giá sấy lúa": 170000,
     "Giá sấy và bảo quản lúa": 410000,
+    username: "kimoanh",
+    password: "123456"
   },
   {
     STT: 5,
-    "Tên lò sấy": "Nhà máy xay lúa - Lò sấy lúa Quốc Danh",
+    id: "shop-quocdanh",
+    "Tên lò sấy": "Nhà máy xay lúa - Cơ sở sấy lúa Quốc Danh",
     "TP/Huyện": "Huyện Lai Vung",
     "Địa điểm": "5M95+G4, Đinh Hoà, Lai Vung, Đồng Tháp, Việt Nam",
     "Tọa độ": [10.168888003822527, 105.65780526246947],
@@ -54,9 +67,12 @@ const shops: ShopData[] = [
     LimitCapacity: 1624,
     "Giá sấy lúa": 175000,
     "Giá sấy và bảo quản lúa": 420000,
+    username: "quocdanh",
+    password: "123456",
   },
   {
     STT: 6,
+    id: "shop-thanhnghiep",
     "Tên lò sấy": "Nhà máy sấy lúa xay lúa Thành Nghiệp",
     "TP/Huyện": "Huyện Châu Thành",
     "Địa điểm":
@@ -66,10 +82,13 @@ const shops: ShopData[] = [
     LimitCapacity: 725,
     "Giá sấy lúa": 180000,
     "Giá sấy và bảo quản lúa": 430000,
+    username: "thanhnghiep",
+    password: "123456",
   },
   {
     STT: 7,
-    "Tên lò sấy": "Lò sấy Trung Hậu",
+    id: "shop-trunghau",
+    "Tên lò sấy": "Cơ sở sấy Trung Hậu",
     "TP/Huyện": "Huyện Châu Thành",
     "Địa điểm":
       "Cầu Số 5, ấp Vĩnh Quới, Vĩnh An, Châu Thành, An Giang 839300, Việt Nam",
@@ -78,9 +97,12 @@ const shops: ShopData[] = [
     LimitCapacity: 660,
     "Giá sấy lúa": 185000,
     "Giá sấy và bảo quản lúa": 440000,
+    username: "trunghau",
+    password: "123456",
   },
   {
     STT: 8,
+    id: "shop-hanhphuoc",
     "Tên lò sấy": "Cơ sở sấy lúa Hạnh Phước",
     "TP/Huyện": "Huyện Châu Thành",
     "Địa điểm": "Số 989 Tổ 8, An Thạnh, Châu Thành, Đồng Tháp 81900, Việt Nam",
@@ -89,9 +111,12 @@ const shops: ShopData[] = [
     LimitCapacity: 1940,
     "Giá sấy lúa": 190000,
     "Giá sấy và bảo quản lúa": 450000,
+    username: "hanhphuoc",
+    password: "123456",
   },
   {
     STT: 9,
+    id: "shop-thaibinh",
     "Tên lò sấy": "Nhà máy sấy lúa Thái Bình",
     "TP/Huyện": "Huyện Châu Thành",
     "Địa điểm": "6QHX+2RJ, Phú Long, Châu Thành, Đồng Tháp, Việt Nam",
@@ -100,9 +125,12 @@ const shops: ShopData[] = [
     LimitCapacity: 1354,
     "Giá sấy lúa": 195000,
     "Giá sấy và bảo quản lúa": 460000,
+    username: "thaibinh",
+    password: "123456",
   },
   {
     STT: 10,
+    id: "shop-huunghia",
     "Tên lò sấy": "Nhà máy sấy lúa Hữu Nghĩa",
     "TP/Huyện": "Huyện Châu Thành",
     "Địa điểm":
@@ -112,9 +140,12 @@ const shops: ShopData[] = [
     LimitCapacity: 1876,
     "Giá sấy lúa": 200000,
     "Giá sấy và bảo quản lúa": 470000,
+    username: "huunghia",
+    password: "123456",
   },
   {
     STT: 11,
+    id: "shop-hiepphat",
     "Tên lò sấy": "Doanh nghiệp tư nhân Hiệp Phát (Xay xát lúa gạo - Sấy lúa)",
     "TP/Huyện": "TX Gò Công",
     "Địa điểm": "Tân Trung, Gò Công, Tiền Giang, Việt Nam",
@@ -123,9 +154,12 @@ const shops: ShopData[] = [
     LimitCapacity: 884,
     "Giá sấy lúa": 205000,
     "Giá sấy và bảo quản lúa": 480000,
+    username: "hiepphat",
+    password: "123456",
   },
   {
     STT: 12,
+    id: "shop-namhai3",
     "Tên lò sấy": "Nam Hải 3 Gia Công Sấy Xay",
     "TP/Huyện": "Huyện Cái Bè",
     "Địa điểm": "9268+3H8, TT. Cái Bè, Cái Bè, Tiền Giang, Việt Nam",
@@ -134,10 +168,13 @@ const shops: ShopData[] = [
     LimitCapacity: 1871,
     "Giá sấy lúa": 210000,
     "Giá sấy và bảo quản lúa": 490000,
+    username: "namhai3",
+    password: "123456",
   },
   {
     STT: 13,
-    "Tên lò sấy": "Lò sấy Bảy Thiên",
+    id: "shop-baythien",
+    "Tên lò sấy": "Cơ sở sấy Bảy Thiên",
     "TP/Huyện": "Huyện Cái Bè",
     "Địa điểm": "GX6W+525, ĐT865, Hậu Mỹ Bắc B, Cái Bè, Tiền Giang, Việt Nam",
     "Tọa độ": [10.510521548616328, 105.9950735656148],
@@ -145,10 +182,13 @@ const shops: ShopData[] = [
     LimitCapacity: 1060,
     "Giá sấy lúa": 215000,
     "Giá sấy và bảo quản lúa": 500000,
+    username: "baythien",
+    password: "123456",
   },
   {
     STT: 14,
-    "Tên lò sấy": "Lò sấy - Nhà máy Đoàn Kết 2",
+    id: "shop-doanket2",
+    "Tên lò sấy": "Cơ sở sấy - Nhà máy Đoàn Kết 2",
     "TP/Huyện": "Huyện Cái Bè",
     "Địa điểm": "CWCQ+3PR, Thiện Trung, Cái Bè, Tiền Giang, Việt Nam",
     "Tọa độ": [10.42043300994279, 105.93924104898723],
@@ -156,9 +196,12 @@ const shops: ShopData[] = [
     LimitCapacity: 1159,
     "Giá sấy lúa": 220000,
     "Giá sấy và bảo quản lúa": 510000,
+    username: "doanket2",
+    password: "123456",
   },
   {
     STT: 15,
+    id: "shop-dongtam",
     "Tên lò sấy": "Cơ sở xay sấy lúa gạo Đồng Tâm",
     "TP/Huyện": "Huyện Cái Bè",
     "Địa điểm": "929C+26P, An Cư, Cái Bè, Tiền Giang, Việt Nam",
@@ -167,9 +210,12 @@ const shops: ShopData[] = [
     LimitCapacity: 787,
     "Giá sấy lúa": 225000,
     "Giá sấy và bảo quản lúa": 520000,
+    username: "dongtam",
+    password: "123456",
   },
   {
     STT: 16,
+    id: "shop-dungkieu",
     "Tên lò sấy": "Nhà máy sấy & xay lúa Dũng Kiều",
     "TP/Huyện": "Huyện Cái Bè",
     "Địa điểm": "9X32+RFV, QL1A, Mỹ Đức Đông, Cái Bè, Tiền Giang, Việt Nam",
@@ -178,9 +224,12 @@ const shops: ShopData[] = [
     LimitCapacity: 1032,
     "Giá sấy lúa": 230000,
     "Giá sấy và bảo quản lúa": 530000,
+    username: "dungkieu",
+    password: "123456",
   },
   {
     STT: 17,
+    id: "shop-quocdat",
     "Tên lò sấy": "Nhà máy sấy xay lúa Quốc Đạt",
     "TP/Huyện": "Huyện Châu Thành",
     "Địa điểm":
@@ -190,10 +239,13 @@ const shops: ShopData[] = [
     LimitCapacity: 1244,
     "Giá sấy lúa": 235000,
     "Giá sấy và bảo quản lúa": 540000,
+    username: "quocdat",
+    password: "123456",
   },
   {
     STT: 18,
-    "Tên lò sấy": "Lò sấy lúa Thủy Linh",
+    id: "shop-thuylinh",
+    "Tên lò sấy": "Cơ sở sấy lúa Thủy Linh",
     "TP/Huyện": "Huyện Cai Lậy",
     "Địa điểm": "Ấp Láng Biển, Mỹ Phước Tây, Cai Lậy, Tiền Giang, Việt Nam",
     "Tọa độ": [10.487752524974201, 106.12708076132189],
@@ -201,9 +253,12 @@ const shops: ShopData[] = [
     LimitCapacity: 1204,
     "Giá sấy lúa": 240000,
     "Giá sấy và bảo quản lúa": 550000,
+    username: "thuylinh",
+    password: "123456",
   },
   {
     STT: 19,
+    id: "shop-thanhthang",
     "Tên lò sấy": "Cơ sở sấy lúa Thanh Thắng",
     "TP/Huyện": "Huyện Cai Lậy",
     "Địa điểm": "Mỹ Phước Tây, Cai Lậy, Tiền Giang, Việt Nam",
@@ -212,10 +267,13 @@ const shops: ShopData[] = [
     LimitCapacity: 1872,
     "Giá sấy lúa": 245000,
     "Giá sấy và bảo quản lúa": 560000,
+    username: "thanhthang",
+    password: "123456",
   },
   {
     STT: 20,
-    "Tên lò sấy": "Lò sấy lúa Út Phong",
+    id: "shop-utphong",
+    "Tên lò sấy": "Cơ sở sấy lúa Út Phong",
     "TP/Huyện": "Huyện Chợ Gạo",
     "Địa điểm":
       "82 ấp Mỹ Trường, Mỹ Tịnh An, Chợ Gạo, Tiền Giang 84500, Việt Nam",
@@ -224,10 +282,13 @@ const shops: ShopData[] = [
     LimitCapacity: 1670,
     "Giá sấy lúa": 250000,
     "Giá sấy và bảo quản lúa": 580000,
+    username: "utphong",
+    password: "123456",
   },
 ];
 export interface ShopData {
   STT: number;
+  id?: string; // ID unique của shop
   "Tên lò sấy": string;
   "TP/Huyện": string;
   "Địa điểm": string;
@@ -236,7 +297,9 @@ export interface ShopData {
   LimitCapacity: number;
   Random?: number;
   "Giá sấy lúa": number;
-  "Giá sấy và bảo quản lúa": number;
+  "Giá sấy và bảo quản lúa"?: number;
+  username: string;
+  password: string;
 }
 
 export default shops;

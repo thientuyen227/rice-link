@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Migrate Orders to use Shop ID - RiceLink</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d5016 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #4ade80;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        .section {
+            background: #1a1a1a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4ade80;
+        }
+        button {
+            background: #4ade80;
+            color: #000;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.2s;
+            margin: 5px;
+        }
+        button:hover {
+            background: #22c55e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+        }
+        button.danger {
+            background: #ef4444;
+            color: #fff;
+        }
+        button.danger:hover {
+            background: #dc2626;
+        }
+        .warning-box {
+            background: #92400e20;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .success-box {
+            background: #15803d20;
+            border: 1px solid #22c55e;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .info-box {
+            background: #1e40af20;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        pre {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #333;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #333;
+        }
+        .status-ok {
+            color: #22c55e;
+        }
+        .status-warning {
+            color: #f59e0b;
+        }
+        .status-error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Migrate Orders to use Shop ID</h1>
+        <p class="subtitle">Cập nhật orders cũ để sử dụng shopId thay vì shopName cho việc filter</p>
+
+        <div class="info-box">
+            <h3 style="margin-top: 0;">📋 Migration Steps:</h3>
+            <ol>
+                <li>Load tất cả orders từ localStorage</li>
+                <li>Map shopName → shopId dựa vào database</li>
+                <li>Cập nhật orders với shopId mới</li>
+                <li>Save lại vào localStorage</li>
+            </ol>
+            <p><strong>Lưu ý:</strong> Migration này an toàn - sẽ giữ lại shopName cho backward compatibility</p>
+        </div>
+
+        <div class="section">
+            <h2>📊 Current Status</h2>
+            <div id="status"></div>
+        </div>
+
+        <div class="section">
+            <h2>🗺️ Shop Name → ID Mapping</h2>
+            <div id="mapping"></div>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ Actions</h2>
+            <button onclick="analyze()">🔍 Analyze Orders</button>
+            <button onclick="migrate()">✅ Migrate Orders</button>
+            <button onclick="resetDb()">🔄 Reset Database (Clear localStorage)</button>
+        </div>
+
+        <div class="section">
+            <h2>📝 Log</h2>
+            <pre id="log"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Shop Name to ID mapping (from shop.ts)
+        const SHOP_NAME_TO_ID = {
+            'Nhà máy sấy lúa SÁU THO': 'shop-sautho',
+            'Cơ sở sấy lúa Lệ Hoa': 'shop-lehoa',
+            'Cơ sở sấy - Nhà máy Lộc Tấn': 'shop-loctan',
+            'Cơ sở sấy lúa Kim Oanh': 'shop-kimoanh',
+            'Nhà máy xay lúa - Cơ sở sấy lúa Quốc Danh': 'shop-quocdanh',
+            'Nhà máy sấy lúa xay lúa Thành Nghiệp': 'shop-thanhnghiep',
+            'Cơ sở sấy Trung Hậu': 'shop-trunghau',
+            'Cơ sở sấy lúa Hạnh Phước': 'shop-hanhphuoc',
+            'Nhà máy sấy lúa Thái Bình': 'shop-thaibinh',
+            'Nhà máy sấy lúa Hữu Nghĩa': 'shop-huunghia',
+            'Doanh nghiệp tư nhân Hiệp Phát (Xay xát lúa gạo - Sấy lúa)': 'shop-hiepphat',
+            'Nam Hải 3 Gia Công Sấy Xay': 'shop-namhai3',
+            'Cơ sở sấy Bảy Thiên': 'shop-baythien',
+            'Cơ sở sấy - Nhà máy Đoàn Kết 2': 'shop-doanket2',
+            'Cơ sở xay sấy lúa gạo Đồng Tâm': 'shop-dongtam',
+            'Nhà máy sấy & xay lúa Dũng Kiều': 'shop-dungkieu',
+            'Nhà máy sấy xay lúa Quốc Đạt': 'shop-quocdat',
+            'Cơ sở sấy lúa Thủy Linh': 'shop-thuylinh',
+            'Cơ sở sấy lúa Thanh Thắng': 'shop-thanhthang',
+            'Cơ sở sấy lúa Út Phong': 'shop-utphong'
+        };
+
+        let logContent = '';
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString('vi-VN');
+            const icon = {
+                info: 'ℹ️',
+                success: '✅',
+                warning: '⚠️',
+                error: '❌'
+            }[type] || 'ℹ️';
+
+            logContent = `[${timestamp}] ${icon} ${message}\n` + logContent;
+            document.getElementById('log').textContent = logContent;
+        }
+
+        function showMapping() {
+            const mappingDiv = document.getElementById('mapping');
+            let html = '<table><tr><th>#</th><th>Shop Name</th><th>→</th><th>Shop ID</th></tr>';
+
+            Object.entries(SHOP_NAME_TO_ID).forEach(([name, id], index) => {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td style="max-width: 300px;">${name}</td>
+                        <td>→</td>
+                        <td><code>${id}</code></td>
+                    </tr>
+                `;
+            });
+
+            html += '</table>';
+            mappingDiv.innerHTML = html;
+        }
+
+        function analyze() {
+            log('🔍 Starting analysis...', 'info');
+
+            const ordersRaw = localStorage.getItem('orders');
+            if (!ordersRaw) {
+                log('No orders found in localStorage', 'warning');
+                document.getElementById('status').innerHTML = '<div class="warning-box"><p>⚠️ No orders found in localStorage</p></div>';
+                return;
+            }
+
+            const orders = JSON.parse(ordersRaw);
+            log(`Found ${orders.length} orders`, 'info');
+
+            let needsMigration = 0;
+            let alreadyMigrated = 0;
+            let unknownShops = 0;
+
+            let html = '<table><tr><th>Order ID</th><th>Client</th><th>Shop Name</th><th>Shop ID</th><th>Status</th></tr>';
+
+            orders.forEach(order => {
+                const hasShopId = !!order.shopId;
+                const shopName = order.shopName || '';
+                const mappedId = SHOP_NAME_TO_ID[shopName.trim()];
+
+                let status = '';
+                let statusClass = '';
+
+                if (hasShopId) {
+                    status = '✅ Already has ID';
+                    statusClass = 'status-ok';
+                    alreadyMigrated++;
+                } else if (mappedId) {
+                    status = '⚠️ Needs migration';
+                    statusClass = 'status-warning';
+                    needsMigration++;
+                } else {
+                    status = '❌ Unknown shop';
+                    statusClass = 'status-error';
+                    unknownShops++;
+                }
+
+                html += `
+                    <tr>
+                        <td style="font-size: 10px;">${order.id.substring(0, 12)}...</td>
+                        <td>${order.clientName}</td>
+                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${shopName}</td>
+                        <td><code>${order.shopId || mappedId || 'N/A'}</code></td>
+                        <td class="${statusClass}">${status}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</table>';
+
+            const summaryHtml = `
+                <div class="success-box">
+                    <p><strong>📊 Summary:</strong></p>
+                    <p>• Total orders: <strong>${orders.length}</strong></p>
+                    <p>• Already migrated: <strong class="status-ok">${alreadyMigrated}</strong></p>
+                    <p>• Needs migration: <strong class="status-warning">${needsMigration}</strong></p>
+                    <p>• Unknown shops: <strong class="status-error">${unknownShops}</strong></p>
+                </div>
+            ` + html;
+
+            document.getElementById('status').innerHTML = summaryHtml;
+
+            log(`Analysis complete: ${alreadyMigrated} OK, ${needsMigration} needs migration, ${unknownShops} unknown`, 'success');
+        }
+
+        function migrate() {
+            if (!confirm('⚠️ Are you sure you want to migrate all orders?\n\nThis will add shopId field to all orders.')) {
+                return;
+            }
+
+            log('🔄 Starting migration...', 'info');
+
+            const ordersRaw = localStorage.getItem('orders');
+            if (!ordersRaw) {
+                alert('No orders to migrate!');
+                log('No orders found', 'error');
+                return;
+            }
+
+            const orders = JSON.parse(ordersRaw);
+            let migratedCount = 0;
+            let skippedCount = 0;
+            let errorCount = 0;
+
+            const updatedOrders = orders.map(order => {
+                // Skip if already has shopId
+                if (order.shopId) {
+                    log(`Skipping order ${order.id.substring(0, 8)}... (already has shopId)`, 'info');
+                    skippedCount++;
+                    return order;
+                }
+
+                const shopName = order.shopName || '';
+                const shopId = SHOP_NAME_TO_ID[shopName.trim()];
+
+                if (shopId) {
+                    log(`Migrating order ${order.id.substring(0, 8)}...: "${shopName}" → ${shopId}`, 'success');
+                    migratedCount++;
+                    return {
+                        ...order,
+                        shopId: shopId // Add shopId, keep shopName for display
+                    };
+                } else {
+                    log(`ERROR: Cannot map shop name "${shopName}" for order ${order.id.substring(0, 8)}...`, 'error');
+                    errorCount++;
+                    return order;
+                }
+            });
+
+            // Save to localStorage
+            localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+            log(`✅ Migration complete!`, 'success');
+            log(`  - Migrated: ${migratedCount}`, 'success');
+            log(`  - Skipped: ${skippedCount}`, 'info');
+            log(`  - Errors: ${errorCount}`, errorCount > 0 ? 'error' : 'info');
+
+            alert(`✅ Migration completed!\n\n• Migrated: ${migratedCount}\n• Skipped: ${skippedCount}\n• Errors: ${errorCount}\n\nPlease refresh shop and admin pages.`);
+
+            // Re-analyze
+            analyze();
+        }
+
+        function resetDb() {
+            if (!confirm('⚠️⚠️⚠️ DANGER ⚠️⚠️⚠️\n\nThis will DELETE ALL DATA:\n- Orders\n- Database\n- Chat messages\n- Shop login\n\nAre you ABSOLUTELY SURE?')) {
+                return;
+            }
+
+            if (!confirm('⚠️ FINAL WARNING!\n\nThis action CANNOT be undone!\n\nClick OK to proceed with deletion.')) {
+                return;
+            }
+
+            localStorage.clear();
+            log('🗑️ All localStorage data cleared', 'warning');
+            alert('✅ Database reset complete!\n\nPlease refresh the page.');
+            location.reload();
+        }
+
+        // Initialize
+        showMapping();
+        analyze();
+        log('🚀 Migration tool initialized', 'success');
+    </script>
+</body>
+</html>
+

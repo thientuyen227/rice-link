@@ -2,15 +2,15 @@
 
 import {
   db,
-  type Account,
   type ShippingCompany,
   type ShopRecord,
+  type Customer,
 } from "@/data/fakeDb";
 import { geocodeAddress } from "@/lib/geocode";
-import { Navigation, Plus, Trash2 } from "lucide-react";
+import { Navigation, Plus, Trash2, Edit, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 const ShopsMap = dynamic(() => import("./ShopsMap"), { ssr: false });
 
 type Order = {
@@ -24,10 +24,11 @@ type Order = {
   // Thông tin bổ sung
   clientAddress?: string;
   clientCapacity?: number;
-  shopName?: string;
+  shopId?: string; // ID của shop - dùng để filter
+  shopName?: string; // Tên shop - dùng để hiển thị
   shippingCompany?: string;
   serviceType?: "drying" | "dryingAndStorage"; // Loại dịch vụ
-  servicePrice?: number; // Giá dịch vụ
+  servicePrice?: number; // Giá sấy
   // Thông tin mới
   moistureType?: "unconfirmed" | "estimated" | "actual"; // Loại độ ẩm
   moistureValue?: string; // Giá trị độ ẩm
@@ -53,6 +54,8 @@ function loadOrders(): Order[] {
 function saveOrders(orders: Order[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+  // Dispatch custom event to notify same-tab components
+  window.dispatchEvent(new CustomEvent("ordersUpdated", { detail: orders }));
 }
 
 function getStatusConfig(status: Order["status"]) {
@@ -92,13 +95,15 @@ export default function AdminPage() {
 
   // Shops
   const [shops, setShops] = useState<ShopRecord[]>([]);
+  const [editingShop, setEditingShop] = useState<ShopRecord | null>(null);
   const [newShop, setNewShop] = useState({
     name: "",
     address: "",
     district: "",
     capacity: 0,
     dryingPrice: 0,
-    dryingAndStoragePrice: 0,
+    username: "",
+    password: "",
   });
 
   // Shipping Companies
@@ -113,13 +118,8 @@ export default function AdminPage() {
     pricePerKm: 0,
   });
 
-  // Farmers (accounts with role farmer)
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const farmers = useMemo(
-    () => accounts.filter((a) => a.role === "farmer"),
-    [accounts]
-  );
-  const [newFarmer, setNewFarmer] = useState({ name: "", email: "" });
+  // Customers (registered customers from client page)
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   // Orders
   const [orders, setOrders] = useState<Order[]>([]);
@@ -128,16 +128,55 @@ export default function AdminPage() {
     // Only run on client side to avoid hydration mismatch
     if (typeof window !== "undefined") {
       setShops(db.listShops());
-      setAccounts(db.listAccounts());
+      setCustomers(db.listCustomers());
       setOrders(loadOrders());
       setShippingCompanies(db.listShippingCompanies());
       setIsLoaded(true);
     }
   }, []);
 
+  // Removed auto-save useEffect to prevent conflict with polling
+  // Orders are now saved explicitly when updated or deleted
+
+  // Poll for new orders every 2 seconds
   useEffect(() => {
-    saveOrders(orders);
-  }, [orders]);
+    const interval = setInterval(() => {
+      if (typeof window !== "undefined") {
+        const newOrders = loadOrders();
+        setOrders(newOrders);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for storage changes from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ORDERS_KEY && e.newValue) {
+        try {
+          const newOrders = JSON.parse(e.newValue) as Order[];
+          setOrders(newOrders);
+        } catch (error) {
+          console.error("Failed to parse orders from storage event:", error);
+        }
+      }
+    };
+
+    // Listen for custom event from same tab
+    const handleOrdersUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<Order[]>;
+      if (customEvent.detail) {
+        setOrders(customEvent.detail);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("ordersUpdated", handleOrdersUpdated);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("ordersUpdated", handleOrdersUpdated);
+    };
+  }, []);
 
   // Shipping Company functions
   function removeShippingCompany(id: string) {
@@ -181,8 +220,8 @@ export default function AdminPage() {
           {(
             [
               { k: "orders", label: "Quản lý đơn hàng" },
-              { k: "shops", label: "Quản lý lò sấy" },
-              { k: "map", label: "Bản đồ lò sấy" },
+              { k: "shops", label: "Quản lý cơ sở sấy" },
+              { k: "map", label: "Bản đồ cơ sở sấy" },
               { k: "farmers", label: "Quản lý khách hàng" },
               { k: "shipping", label: "Quản lý vận chuyển" },
               { k: "payment", label: "Quản lý thanh toán" },
@@ -234,8 +273,8 @@ export default function AdminPage() {
                   rating: 0,
                   limitCapacity: cap > 0 ? cap : 0,
                   dryingPrice: Number(newShop.dryingPrice) || 0,
-                  dryingAndStoragePrice:
-                    Number(newShop.dryingAndStoragePrice) || 0,
+                  username: newShop.username.trim() || undefined,
+                  password: newShop.password.trim() || undefined,
                 });
                 setShops([created, ...shops]);
                 setNewShop({
@@ -244,18 +283,19 @@ export default function AdminPage() {
                   district: "",
                   capacity: 0,
                   dryingPrice: 0,
-                  dryingAndStoragePrice: 0,
+                  username: "",
+                  password: "",
                 });
               }}
               className="bg-gray-800 rounded-2xl p-6 shadow-xl border border-gray-700 h-fit"
             >
               <h2 className="text-xl font-bold text-gray-100 mb-6">
-                Thêm lò sấy
+                Thêm cơ sở sấy
               </h2>
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Tên lò
+                    Tên cơ sở sấy
                   </label>
                   <input
                     value={newShop.name}
@@ -323,23 +363,41 @@ export default function AdminPage() {
                     className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Giá sấy và bảo quản lúa (VND/Tấn)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={newShop.dryingAndStoragePrice}
-                    onChange={(e) =>
-                      setNewShop({
-                        ...newShop,
-                        dryingAndStoragePrice: Number(e.target.value || 0),
-                      })
-                    }
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
-                  />
+
+                {/* Username và Password */}
+                <div className="pt-4 border-t border-gray-600">
+                  <h3 className="text-sm font-bold text-gray-200 mb-3">Tài khoản đăng nhập</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">
+                        Username
+                      </label>
+                      <input
+                        value={newShop.username}
+                        onChange={(e) =>
+                          setNewShop({ ...newShop, username: e.target.value })
+                        }
+                        placeholder="Nhập username"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        value={newShop.password}
+                        onChange={(e) =>
+                          setNewShop({ ...newShop, password: e.target.value })
+                        }
+                        placeholder="Nhập password"
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                      />
+                    </div>
+                  </div>
                 </div>
+
                 <button
                   type="submit"
                   className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold text-sm hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mt-2"
@@ -354,7 +412,7 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-gray-100">
-                      Danh sách lò sấy
+                      Danh sách cơ sở sấy
                     </h2>
                     <p className="text-sm text-gray-400 mt-1">
                       {shops.length} lò
@@ -366,8 +424,9 @@ export default function AdminPage() {
                       setShops(db.listShops());
                     }}
                     className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl text-sm hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg"
+                    title="Đồng bộ giá và tài khoản từ dữ liệu gốc"
                   >
-                    Cập nhật giá
+                    🔄 Đồng bộ dữ liệu
                   </button>
                 </div>
               </div>
@@ -375,133 +434,340 @@ export default function AdminPage() {
                 {shops.map((s) => (
                   <div
                     key={s.id}
-                    className="p-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-center hover:bg-gray-750 transition-colors"
+                    className="p-5 hover:bg-gray-750 transition-colors"
                   >
-                    <div className="md:col-span-6">
-                      <p className="font-semibold text-gray-100">{s.name}</p>
-                      <p className="text-sm text-gray-400 mt-1">{s.address}</p>
-                    </div>
-                    <div className="md:col-span-4 text-sm text-gray-400">
-                      <div> Công suất: {s.limitCapacity} Tấn</div>
-                      <div>
-                        Giá sấy: {(s.dryingPrice || 0).toLocaleString("vi-VN")}{" "}
-                        VND/Tấn
+                    <div className="flex flex-col gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-11 gap-6 items-start">
+                        <div className="md:col-span-5">
+                          <p className="font-semibold text-gray-100 text-lg">{s.name}</p>
+                          <p className="text-sm text-gray-400 mt-1">{s.address}</p>
+                          <p className="text-xs text-gray-500 mt-1">{s.district}</p>
+                        </div>
+                        <div className="md:col-span-3 text-sm text-gray-400">
+                          <div className="mb-1">💪 Công suất: {s.limitCapacity} Tấn</div>
+                          <div>
+                            💵 Giá sấy: {(s.dryingPrice || 0).toLocaleString("vi-VN")} VND/Tấn
+                          </div>
+                        </div>
+                        <div className="md:col-span-3 text-sm">
+                          {s.username || s.password ? (
+                            <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
+                              <div className="text-xs text-gray-400 mb-2 font-semibold">Tài khoản đăng nhập</div>
+                              {s.username && (
+                                <div className="mb-1">
+                                  <span className="text-gray-400">👤 User:</span>{" "}
+                                  <span className="text-gray-200 font-medium">{s.username}</span>
+                                </div>
+                              )}
+                              {s.password && (
+                                <div>
+                                  <span className="text-gray-400">🔒 Pass:</span>{" "}
+                                  <span className="text-gray-200 font-medium">{s.password}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-gray-500 text-xs italic">Chưa có tài khoản</div>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        Giá sấy + bảo quản:{" "}
-                        {(s.dryingAndStoragePrice || 0).toLocaleString("vi-VN")}{" "}
-                        VND/Tấn
+
+                      {/* Nút action ở dưới */}
+                      <div className="flex items-center justify-end gap-3 pt-3">
+                        <button
+                          onClick={() => setEditingShop(s)}
+                          className="flex items-center gap-2 px-4 py-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 rounded-xl transition-all border border-blue-500/30 hover:border-blue-400"
+                          title="Chỉnh sửa lò"
+                        >
+                          <Edit size={16} />
+                          <span className="text-sm font-medium">Chỉnh sửa</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Bạn có chắc muốn xóa "${s.name}"?`)) {
+                              db.deleteShop(s.id);
+                              setShops((prev) => prev.filter((x) => x.id !== s.id));
+                            }
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-xl transition-all border border-red-500/30 hover:border-red-400"
+                          title="Xóa lò"
+                        >
+                          <Trash2 size={16} />
+                          <span className="text-sm font-medium">Xóa</span>
+                        </button>
                       </div>
-                    </div>
-                    <div className="md:col-span-2 text-right">
-                      <button
-                        onClick={() => {
-                          db.deleteShop(s.id);
-                          setShops((prev) => prev.filter((x) => x.id !== s.id));
-                        }}
-                        className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
-                        title="Xóa lò"
-                      >
-                        <Trash2 size={18} />
-                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* Modal Chỉnh sửa */}
+            {editingShop && (
+              <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                <div className="bg-gray-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-gray-100">
+                      Chỉnh sửa thông tin lò sấy
+                    </h3>
+                    <button
+                      onClick={() => setEditingShop(null)}
+                      className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-lg transition-all"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const updated = db.updateShop(editingShop.id, {
+                        name: editingShop.name,
+                        address: editingShop.address,
+                        district: editingShop.district,
+                        limitCapacity: editingShop.limitCapacity,
+                        dryingPrice: editingShop.dryingPrice,
+                        username: editingShop.username,
+                        password: editingShop.password,
+                      });
+                      if (updated) {
+                        setShops((prev) =>
+                          prev.map((s) => (s.id === updated.id ? updated : s))
+                        );
+                        setEditingShop(null);
+                      }
+                    }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">
+                        Tên cơ sở sấy
+                      </label>
+                      <input
+                        value={editingShop.name}
+                        onChange={(e) =>
+                          setEditingShop({ ...editingShop, name: e.target.value })
+                        }
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">
+                        Địa chỉ
+                      </label>
+                      <input
+                        value={editingShop.address}
+                        onChange={(e) =>
+                          setEditingShop({ ...editingShop, address: e.target.value })
+                        }
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">
+                        Huyện/Tỉnh
+                      </label>
+                      <input
+                        value={editingShop.district}
+                        onChange={(e) =>
+                          setEditingShop({ ...editingShop, district: e.target.value })
+                        }
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-300 mb-2">
+                          Công suất (Tấn/ngày)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={editingShop.limitCapacity}
+                          onChange={(e) =>
+                            setEditingShop({
+                              ...editingShop,
+                              limitCapacity: Number(e.target.value || 0),
+                            })
+                          }
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-300 mb-2">
+                          Giá sấy lúa (VND/Tấn)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={editingShop.dryingPrice}
+                          onChange={(e) =>
+                            setEditingShop({
+                              ...editingShop,
+                              dryingPrice: Number(e.target.value || 0),
+                            })
+                          }
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                        />
+                      </div>
+                    </div>
+
+
+                    <div className="pt-4 border-t border-gray-600">
+                      <h4 className="text-sm font-bold text-gray-200 mb-3">
+                        Tài khoản đăng nhập
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-300 mb-2">
+                            Username
+                          </label>
+                          <input
+                            value={editingShop.username || ""}
+                            onChange={(e) =>
+                              setEditingShop({
+                                ...editingShop,
+                                username: e.target.value,
+                              })
+                            }
+                            placeholder="Nhập username"
+                            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-300 mb-2">
+                            Password
+                          </label>
+                          <input
+                            type="text"
+                            value={editingShop.password || ""}
+                            onChange={(e) =>
+                              setEditingShop({
+                                ...editingShop,
+                                password: e.target.value,
+                              })
+                            }
+                            placeholder="Nhập password"
+                            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 justify-end pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setEditingShop(null)}
+                        className="px-6 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 transition-all font-medium"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-medium shadow-lg"
+                      >
+                        💾 Lưu thay đổi
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
       )}
 
       {tab === "farmers" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!newFarmer.name.trim() || !newFarmer.email.trim()) return;
-              const created = db.createAccount({
-                name: newFarmer.name.trim(),
-                email: newFarmer.email.trim(),
-                role: "farmer",
-                password: "123456",
-              });
-              setAccounts([created, ...accounts]);
-              setNewFarmer({ name: "", email: "" });
-            }}
-            className="bg-gray-800 rounded-2xl p-6 shadow-xl border border-gray-700 h-fit"
-          >
-            <h2 className="text-xl font-bold text-gray-100 mb-6">
-              Thêm khách hàng
+        <div className="bg-gray-800 rounded-2xl shadow-xl border border-gray-700 overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-700">
+            <h2 className="text-xl font-bold text-gray-100">
+              Danh sách khách hàng
             </h2>
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Tên
-                </label>
-                <input
-                  value={newFarmer.name}
-                  onChange={(e) =>
-                    setNewFarmer({ ...newFarmer, name: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Email
-                </label>
-                <input
-                  value={newFarmer.email}
-                  onChange={(e) =>
-                    setNewFarmer({ ...newFarmer, email: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold text-sm hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mt-2"
-              >
-                <Plus size={18} /> Thêm khách hàng
-              </button>
-            </div>
-          </form>
-
-          <div className="lg:col-span-2 bg-gray-800 rounded-2xl shadow-xl border border-gray-700 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-700">
-              <h2 className="text-xl font-bold text-gray-100">
-                Danh sách khách hàng
-              </h2>
-              <p className="text-sm text-gray-400 mt-1">
-                {farmers.length} khách hàng
-              </p>
-            </div>
-            <div className="divide-y divide-gray-700">
-              {farmers.map((f) => (
-                <div
-                  key={f.id}
-                  className="p-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-center hover:bg-gray-750 transition-colors"
-                >
-                  <div className="md:col-span-8">
-                    <p className="font-semibold text-gray-100">{f.name}</p>
-                    <p className="text-sm text-gray-400 mt-1">{f.email}</p>
-                  </div>
-                  <div className="md:col-span-4 text-right">
-                    <button
-                      onClick={() => {
-                        db.deleteAccount(f.id);
-                        setAccounts((prev) =>
-                          prev.filter((x) => x.id !== f.id)
-                        );
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
-                      title="Xóa khách hàng"
+            <p className="text-sm text-gray-400 mt-1">
+              {customers.length} khách hàng đã đăng ký
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-750 border-b border-gray-700">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
+                    Tên khách hàng
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
+                    Số điện thoại
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
+                    Email
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
+                    Loại khách hàng
+                  </th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-300">
+                    Thao tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {customers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center">
+                      <p className="text-gray-400">Chưa có khách hàng nào đăng ký</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Khách hàng sẽ tự đăng ký từ trang client
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  customers.map((customer) => (
+                    <tr
+                      key={customer.id}
+                      className="hover:bg-gray-750 transition-colors"
                     >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                      <td className="px-6 py-4">
+                        <p className="font-semibold text-gray-100">{customer.name}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-gray-300">{customer.phoneNumber}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-gray-300">{customer.email || "—"}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                          {customer.customerType === "farmer" && "Nông dân"}
+                          {customer.customerType === "cooperative" && "Hợp tác xã"}
+                          {customer.customerType === "trader" && "Thương lái"}
+                          {customer.customerType === "enterprise" && "Doanh nghiệp"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => {
+                            if (confirm(`Bạn có chắc muốn xóa khách hàng "${customer.name}"?`)) {
+                              db.deleteCustomer(customer.id);
+                              setCustomers((prev) =>
+                                prev.filter((c) => c.id !== customer.id)
+                              );
+                            }
+                          }}
+                          className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+                          title="Xóa khách hàng"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -566,7 +832,7 @@ export default function AdminPage() {
                               )}
                               {o.shopName && (
                                 <div>
-                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tên lò sấy</p>
+                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tên cơ sở sấy</p>
                                   <p className="text-white flex items-center">
                                     🏭 {o.shopName}
                                   </p>
@@ -598,16 +864,8 @@ export default function AdminPage() {
                               )}
                               {o.servicePrice && (
                                 <div>
-                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Giá dịch vụ</p>
+                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Giá sấy</p>
                                   <p className="text-yellow-400 font-bold">💰 {o.servicePrice.toLocaleString("vi-VN")} VNĐ/Tấn</p>
-                                </div>
-                              )}
-                              {o.moistureType && o.moistureType !== "unconfirmed" && o.moistureValue && (
-                                <div>
-                                  <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Độ ẩm của lúa</p>
-                                  <p className="text-white">
-                                    💧 {o.moistureValue}% ({o.moistureType === "estimated" ? "Ước tính" : "Thực tế"})
-                                  </p>
                                 </div>
                               )}
                               {o.deliveryDate && (
@@ -627,11 +885,14 @@ export default function AdminPage() {
                                   <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Phương thức thanh toán</p>
                                   <p className="text-white">
                                     💳 {
-                                      o.paymentMethod === "cash" ? "Tiền mặt" :
-                                      o.paymentMethod === "bank_transfer" ? "Chuyển khoản" :
-                                      o.paymentMethod === "momo" ? "MoMo" :
+                                      o.paymentMethod === "momo" ? "Momo" :
+                                      o.paymentMethod === "vnpay" ? "VnPay" :
                                       o.paymentMethod === "zalopay" ? "ZaloPay" :
-                                      o.paymentMethod === "vnpay" ? "VNPay" : o.paymentMethod
+                                      o.paymentMethod === "viettel_money" ? "Viettel Money" :
+                                      o.paymentMethod === "bank" ? "Ngân hàng" :
+                                      o.paymentMethod === "visa" ? "Thẻ Visa" :
+                                      o.paymentMethod === "master" ? "Thẻ Master" :
+                                      o.paymentMethod === "icb" ? "ICB" : o.paymentMethod
                                     }
                                   </p>
                                 </div>
@@ -676,7 +937,11 @@ export default function AdminPage() {
                               onClick={() => {
                                 const confirmed = window.confirm("Bạn có chắc muốn xóa đơn hàng này?");
                                 if (confirmed) {
-                                  setOrders((prev) => prev.filter((x) => x.id !== o.id));
+                                  setOrders((prev) => {
+                                    const updated = prev.filter((x) => x.id !== o.id);
+                                    saveOrders(updated); // Save explicitly after delete
+                                    return updated;
+                                  });
                                 }
                               }}
                               className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"

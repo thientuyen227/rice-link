@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Database - RiceLink</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-fix {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-fix:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-clear {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-clear:hover {
+            background: #c0392b;
+        }
+        .btn-back {
+            background: #3498db;
+            color: white;
+        }
+        .btn-back:hover {
+            background: #2980b9;
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        .info p {
+            margin: 5px 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Database</h1>
+        <p class="subtitle">Sửa lỗi localStorage cho RiceLink</p>
+
+        <div id="status" class="status"></div>
+
+        <div class="info">
+            <h3>ℹ️ Thông tin</h3>
+            <p id="dbStatus">Đang kiểm tra...</p>
+            <p id="customerCount">Số khách hàng: <span id="count">0</span></p>
+        </div>
+
+        <button class="btn-fix" onclick="fixDatabase()">
+            ✅ Sửa Database (Khuyến nghị)
+        </button>
+
+        <button class="btn-clear" onclick="clearAll()">
+            🗑️ Xóa Tất Cả Dữ Liệu
+        </button>
+
+        <button class="btn-back" onclick="goToClient()">
+            ← Quay lại trang Client
+        </button>
+    </div>
+
+    <script>
+        // Check database status on load
+        window.addEventListener('DOMContentLoaded', checkDatabase);
+
+        function checkDatabase() {
+            try {
+                const raw = localStorage.getItem('demo_db_v1');
+                if (!raw) {
+                    document.getElementById('dbStatus').textContent = '❌ Database chưa tồn tại';
+                    document.getElementById('count').textContent = '0';
+                    return;
+                }
+
+                const db = JSON.parse(raw);
+
+                if (!db.customers) {
+                    document.getElementById('dbStatus').textContent = '⚠️ Database thiếu trường customers';
+                    document.getElementById('count').textContent = '0';
+                } else {
+                    document.getElementById('dbStatus').textContent = '✅ Database hoạt động bình thường';
+                    document.getElementById('count').textContent = db.customers.length;
+                }
+            } catch (e) {
+                document.getElementById('dbStatus').textContent = '❌ Database bị lỗi: ' + e.message;
+                document.getElementById('count').textContent = '0';
+            }
+        }
+
+        function showStatus(message, isSuccess) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + (isSuccess ? 'success' : 'error');
+
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        function fixDatabase() {
+            try {
+                const raw = localStorage.getItem('demo_db_v1');
+                let db;
+
+                if (!raw) {
+                    // Create new database
+                    db = {
+                        accounts: [],
+                        shops: [],
+                        shippingCompanies: [],
+                        customers: []
+                    };
+                } else {
+                    db = JSON.parse(raw);
+
+                    // Ensure all fields exist
+                    if (!db.customers) {
+                        db.customers = [];
+                    }
+                    if (!db.accounts) {
+                        db.accounts = [];
+                    }
+                    if (!db.shops) {
+                        db.shops = [];
+                    }
+                    if (!db.shippingCompanies) {
+                        db.shippingCompanies = [];
+                    }
+                }
+
+                // Save fixed database
+                localStorage.setItem('demo_db_v1', JSON.stringify(db));
+
+                showStatus('✅ Database đã được sửa thành công!', true);
+                checkDatabase();
+
+                setTimeout(() => {
+                    window.location.href = '/client';
+                }, 2000);
+            } catch (e) {
+                showStatus('❌ Lỗi khi sửa database: ' + e.message, false);
+            }
+        }
+
+        function clearAll() {
+            if (confirm('⚠️ Bạn có chắc muốn xóa TẤT CẢ dữ liệu?\n\nSẽ xóa:\n- Tài khoản khách hàng\n- Đơn hàng\n- Tin nhắn\n- Tất cả dữ liệu khác')) {
+                try {
+                    localStorage.clear();
+                    showStatus('✅ Đã xóa tất cả dữ liệu!', true);
+                    checkDatabase();
+
+                    setTimeout(() => {
+                        window.location.href = '/client';
+                    }, 2000);
+                } catch (e) {
+                    showStatus('❌ Lỗi khi xóa: ' + e.message, false);
+                }
+            }
+        }
+
+        function goToClient() {
+            window.location.href = '/client';
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Shop Matching</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .container {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border-left: 4px solid #10b981;
+        }
+        h1 { color: #10b981; }
+        h2 { color: #3b82f6; margin-top: 0; }
+        pre {
+            background: #020617;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid #334155;
+        }
+        .match { color: #10b981; font-weight: bold; }
+        .nomatch { color: #ef4444; font-weight: bold; }
+        .warning { color: #fbbf24; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        th {
+            background: #0f172a;
+            color: #10b981;
+            font-weight: bold;
+        }
+        tr:hover {
+            background: #0f172a;
+        }
+        button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #059669;
+        }
+        .code {
+            background: #374151;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test Shop ID Matching Logic</h1>
+
+    <div class="container">
+        <h2>📋 Test Controls</h2>
+        <button onclick="runTest()">▶️ Run Test</button>
+        <button onclick="clearOrders()">🗑️ Clear All Orders</button>
+        <button onclick="createTestOrder()">➕ Create Test Order</button>
+        <button onclick="location.reload()">🔄 Refresh</button>
+    </div>
+
+    <div class="container">
+        <h2>🏭 Available Shops (from shop.ts)</h2>
+        <table id="shopsTable">
+            <thead>
+                <tr>
+                    <th>Shop ID</th>
+                    <th>Shop Name</th>
+                    <th>Orders Count</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="shopsBody"></tbody>
+        </table>
+    </div>
+
+    <div class="container">
+        <h2>📦 Orders in localStorage</h2>
+        <table id="ordersTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Order ID</th>
+                    <th>shopId</th>
+                    <th>shopName</th>
+                    <th>Client</th>
+                    <th>Match?</th>
+                </tr>
+            </thead>
+            <tbody id="ordersBody"></tbody>
+        </table>
+    </div>
+
+    <div class="container">
+        <h2>🧪 Test Results</h2>
+        <pre id="testResults"></pre>
+    </div>
+
+    <div class="container">
+        <h2>🔬 Current Shop Login</h2>
+        <div>
+            <label>Logged in as: <span class="code" id="currentShop">Not logged in</span></label>
+        </div>
+        <div style="margin-top: 10px;">
+            <button onclick="loginShop('shop-sautho', 'Nhà máy sấy lúa SÁU THO')">Login as SÁU THO</button>
+            <button onclick="loginShop('shop-lehoa', 'Cơ sở sấy lúa Lệ Hoa')">Login as Lệ Hoa</button>
+            <button onclick="localStorage.removeItem('currentShopName'); location.reload()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        const SHOPS = [
+            { id: "shop-sautho", name: "Nhà máy sấy lúa SÁU THO" },
+            { id: "shop-lehoa", name: "Cơ sở sấy lúa Lệ Hoa" },
+            { id: "shop-loctan", name: "Cơ sở sấy - Nhà máy Lộc Tấn" },
+            { id: "shop-kimoanh", name: "Cơ sở sấy lúa Kim Oanh" },
+            { id: "shop-quocdanh", name: "Nhà máy xay lúa - Cơ sở sấy lúa Quốc Danh" },
+        ];
+
+        function getOrders() {
+            const ordersStr = localStorage.getItem('orders');
+            return ordersStr ? JSON.parse(ordersStr) : [];
+        }
+
+        function saveOrders(orders) {
+            localStorage.setItem('orders', JSON.stringify(orders));
+        }
+
+        function loginShop(shopId, shopName) {
+            localStorage.setItem('currentShopName', shopName);
+            alert('Logged in as: ' + shopName);
+            location.reload();
+        }
+
+        function clearOrders() {
+            if (confirm('Clear all orders?')) {
+                localStorage.removeItem('orders');
+                location.reload();
+            }
+        }
+
+        function createTestOrder() {
+            const shopId = prompt('Enter shop ID (e.g., shop-sautho):');
+            if (!shopId) return;
+
+            const shop = SHOPS.find(s => s.id === shopId);
+            if (!shop) {
+                alert('Shop not found!');
+                return;
+            }
+
+            const orders = getOrders();
+            const newOrder = {
+                id: 'order-test-' + Date.now(),
+                clientName: 'Test Client ' + Date.now(),
+                phoneNumber: '0123456789',
+                item: 'Test Order',
+                quantity: 1,
+                status: 'pending',
+                createdAt: Date.now(),
+                shopId: shopId,
+                shopName: shop.name,
+                clientCapacity: 100,
+            };
+
+            orders.push(newOrder);
+            saveOrders(orders);
+            alert('Test order created!');
+            location.reload();
+        }
+
+        function runTest() {
+            const orders = getOrders();
+            const currentShopName = localStorage.getItem('currentShopName');
+
+            let results = '='.repeat(60) + '\n';
+            results += 'TEST: Shop ID Matching Logic\n';
+            results += '='.repeat(60) + '\n\n';
+
+            results += '📍 Current Shop Name (from localStorage):\n';
+            results += '   "' + (currentShopName || 'NOT SET') + '"\n\n';
+
+            // Find current shop ID
+            const currentShop = SHOPS.find(s => s['Tên lò sấy'] === currentShopName || s.name === currentShopName);
+            results += '🏭 Current Shop ID (matched):\n';
+            results += '   ' + (currentShop ? currentShop.id : 'NOT FOUND') + '\n\n';
+
+            results += '📦 Total Orders: ' + orders.length + '\n\n';
+
+            results += 'MATCHING RESULTS:\n';
+            results += '-'.repeat(60) + '\n';
+
+            let matchCount = 0;
+            orders.forEach((order, i) => {
+                results += `\nOrder ${i + 1}: ${order.id.substring(0, 20)}...\n`;
+                results += `  shopId: "${order.shopId || 'MISSING'}"\n`;
+                results += `  shopName: "${order.shopName || 'N/A'}"\n`;
+                results += `  client: ${order.clientName}\n`;
+
+                if (currentShop) {
+                    const matchById = order.shopId === currentShop.id;
+                    const matchByName = order.shopName && order.shopName.trim() === currentShop.name.trim();
+
+                    results += `  Match by ID: ${matchById ? '✅ YES' : '❌ NO'}\n`;
+                    results += `  Match by Name: ${matchByName ? '✅ YES' : '❌ NO'}\n`;
+
+                    if (matchById || matchByName) {
+                        matchCount++;
+                        results += `  → WOULD BE DISPLAYED ✅\n`;
+                    } else {
+                        results += `  → WOULD BE HIDDEN ❌\n`;
+                    }
+                }
+            });
+
+            results += '\n' + '='.repeat(60) + '\n';
+            results += `SUMMARY: ${matchCount} of ${orders.length} orders match current shop\n`;
+            results += '='.repeat(60) + '\n';
+
+            document.getElementById('testResults').textContent = results;
+        }
+
+        function renderShops() {
+            const orders = getOrders();
+            const tbody = document.getElementById('shopsBody');
+            tbody.innerHTML = '';
+
+            SHOPS.forEach(shop => {
+                const orderCount = orders.filter(o => o.shopId === shop.id).length;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="code">${shop.id}</span></td>
+                    <td>${shop.name}</td>
+                    <td><span class="${orderCount > 0 ? 'match' : ''}">${orderCount}</span></td>
+                    <td>
+                        <button onclick="createTestOrder('${shop.id}')">Add Test Order</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderOrders() {
+            const orders = getOrders();
+            const currentShopName = localStorage.getItem('currentShopName');
+            const currentShop = SHOPS.find(s => s.name === currentShopName);
+            const tbody = document.getElementById('ordersBody');
+            tbody.innerHTML = '';
+
+            if (orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#6b7280;">No orders found</td></tr>';
+                return;
+            }
+
+            orders.forEach((order, i) => {
+                const match = currentShop && (
+                    order.shopId === currentShop.id ||
+                    (order.shopName && order.shopName.trim() === currentShop.name.trim())
+                );
+
+                const tr = document.createElement('tr');
+                tr.style.background = match ? '#065f4620' : '';
+                tr.innerHTML = `
+                    <td>${i + 1}</td>
+                    <td><span class="code">${order.id.substring(0, 15)}...</span></td>
+                    <td><span class="code ${order.shopId ? 'match' : 'nomatch'}">${order.shopId || 'MISSING'}</span></td>
+                    <td>${order.shopName || 'N/A'}</td>
+                    <td>${order.clientName}</td>
+                    <td><span class="${match ? 'match' : 'nomatch'}">${match ? '✅ YES' : '❌ NO'}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateCurrentShop() {
+            const currentShopName = localStorage.getItem('currentShopName');
+            document.getElementById('currentShop').textContent = currentShopName || 'Not logged in';
+        }
+
+        // Initialize
+        updateCurrentShop();
+        renderShops();
+        renderOrders();
+        runTest();
+
+        // Auto refresh every 3 seconds
+        setInterval(() => {
+            renderShops();
+            renderOrders();
+            runTest();
+        }, 3000);
+    </script>
+</body>
+</html>
+

@@ -11,6 +11,9 @@ export default function ShopsMap() {
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
+    // Prevent creating multiple map instances (React Strict Mode runs effect twice)
+    if (mapRef.current) return;
+
     const mapInstance = new vietmapgl.Map({
       container: mapContainerRef.current,
       style: `https://maps.vietmap.vn/maps/styles/tm/style.json?apikey=${apiKey}`,
@@ -51,7 +54,16 @@ export default function ShopsMap() {
     };
     window.addEventListener("demo:shops-updated", onUpdated);
     return () => {
-      mapInstance.remove();
+      try {
+        if (mapInstance) {
+          const container = mapInstance.getContainer?.();
+          if (container && container.parentNode) {
+            mapInstance.remove();
+          }
+        }
+      } catch {
+        // Silently ignore cleanup errors
+      }
       mapRef.current = null;
       window.removeEventListener("demo:shops-updated", onUpdated);
     };

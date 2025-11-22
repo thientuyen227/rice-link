@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Test Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 2px solid #444;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            margin: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #00dd00;
+        }
+        .success {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .error {
+            color: #ff0000;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+        }
+        .shop-item {
+            background: #333;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            border-left: 4px solid #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Quick Test Login</h1>
+
+    <div class="section">
+        <h2>📋 Shops trong FakeDb</h2>
+        <button onclick="loadShops()">🔄 Reload Shops</button>
+        <div id="shops-list"></div>
+    </div>
+
+    <div class="section">
+        <h2>🧪 Test Login</h2>
+        <input type="text" id="username" placeholder="Username" value="test">
+        <input type="password" id="password" placeholder="Password" value="123456">
+        <button onclick="testLogin()">🔐 Test Login</button>
+        <div id="login-result"></div>
+    </div>
+
+    <script>
+        function loadShops() {
+            const raw = localStorage.getItem('demo_db_v1');
+            const div = document.getElementById('shops-list');
+
+            if (!raw) {
+                div.innerHTML = '<p class="error">❌ No demo_db_v1 found!</p>';
+                return;
+            }
+
+            try {
+                const db = JSON.parse(raw);
+                const shops = db.shops || [];
+
+                div.innerHTML = `
+                    <p><strong>Total: ${shops.length} shops</strong></p>
+                    ${shops.map((s, i) => `
+                        <div class="shop-item">
+                            <strong>${i + 1}. ${s.name}</strong><br>
+                            <span style="color: #aaa">ID:</span> ${s.id}<br>
+                            <span style="color: #aaa">Username:</span> <span class="success">${s.username || '❌ NONE'}</span><br>
+                            <span style="color: #aaa">Password:</span> <span class="success">${s.password || '❌ NONE'}</span>
+                        </div>
+                    `).join('')}
+                `;
+            } catch (e) {
+                div.innerHTML = `<p class="error">Error: ${e.message}</p>`;
+            }
+        }
+
+        function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('login-result');
+
+            const raw = localStorage.getItem('demo_db_v1');
+            if (!raw) {
+                resultDiv.innerHTML = '<p class="error">❌ No database found!</p>';
+                return;
+            }
+
+            try {
+                const db = JSON.parse(raw);
+                const shops = db.shops || [];
+
+                console.log('🔐 Testing login:', { username, password });
+                console.log('📋 Available shops:', shops);
+
+                // Find shop (case-insensitive username)
+                const shop = shops.find(s =>
+                    s.username?.toLowerCase() === username.toLowerCase() &&
+                    s.password === password
+                );
+
+                if (shop) {
+                    resultDiv.innerHTML = `
+                        <div style="margin-top: 20px; padding: 15px; background: #004400; border: 2px solid #00ff00; border-radius: 4px;">
+                            <p class="success">✅ LOGIN SUCCESS!</p>
+                            <p><strong>Shop:</strong> ${shop.name}</p>
+                            <p><strong>Username:</strong> ${shop.username}</p>
+                            <p><strong>Password:</strong> ${shop.password}</p>
+                        </div>
+                    `;
+                    console.log('✅ Login success:', shop);
+                } else {
+                    // Show shops with similar username
+                    const similar = shops.filter(s =>
+                        s.username?.toLowerCase().includes(username.toLowerCase()) ||
+                        s.name?.toLowerCase().includes(username.toLowerCase())
+                    );
+
+                    resultDiv.innerHTML = `
+                        <div style="margin-top: 20px; padding: 15px; background: #440000; border: 2px solid #ff0000; border-radius: 4px;">
+                            <p class="error">❌ LOGIN FAILED!</p>
+                            <p>Trying: <strong>${username}</strong> / <strong>${password}</strong></p>
+                            ${similar.length > 0 ? `
+                                <p style="margin-top: 15px;">Shops found with "${username}":</p>
+                                ${similar.map(s => `
+                                    <div style="background: #333; padding: 8px; margin: 5px 0;">
+                                        ${s.name}<br>
+                                        User: <strong>${s.username}</strong> / Pass: <strong>${s.password}</strong>
+                                    </div>
+                                `).join('')}
+                            ` : '<p>No similar shops found</p>'}
+                        </div>
+                    `;
+                    console.log('❌ Login failed. Available shops:', shops.map(s => ({
+                        name: s.name,
+                        username: s.username,
+                        password: s.password
+                    })));
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `<p class="error">Error: ${e.message}</p>`;
+            }
+        }
+
+        // Auto load on page load
+        loadShops();
+    </script>
+</body>
+</html>
+

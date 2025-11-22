@@ -1,6 +1,7 @@
 import seedShops from "./shop";
 
 export type Role = "farmer" | "shop" | "admin";
+export type CustomerType = "farmer" | "cooperative" | "trader" | "enterprise";
 
 export interface Account {
   id: string;
@@ -9,6 +10,20 @@ export interface Account {
   role: Role;
   // simple auth fields for demo — DO NOT use in production
   password?: string;
+  createdAt: number;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  email?: string;
+  address: string; // Địa chỉ đầy đủ
+  province: string; // Tỉnh/Thành phố
+  district: string; // Quận/Huyện
+  ward: string; // Xã/Phường/Thị trấn
+  customerType: CustomerType;
+  password: string;
   createdAt: number;
 }
 
@@ -21,7 +36,8 @@ export interface ShopRecord {
   rating: number;
   limitCapacity: number;
   dryingPrice: number; // Giá sấy lúa (VND)
-  dryingAndStoragePrice: number; // Giá sấy và bảo quản lúa (VND)
+  username?: string; // Tài khoản đăng nhập
+  password?: string; // Mật khẩu
   createdAt: number;
 }
 
@@ -38,19 +54,28 @@ interface DbSchema {
   accounts: Account[];
   shops: ShopRecord[];
   shippingCompanies: ShippingCompany[];
+  customers: Customer[];
 }
 
 const STORAGE_KEY = "demo_db_v1";
 
 function readDb(): DbSchema {
   if (typeof window === "undefined")
-    return { accounts: [], shops: [], shippingCompanies: [] };
+    return { accounts: [], shops: [], shippingCompanies: [], customers: [] };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { accounts: [], shops: [], shippingCompanies: [] };
-    return JSON.parse(raw) as DbSchema;
+    if (!raw) return { accounts: [], shops: [], shippingCompanies: [], customers: [] };
+    const db = JSON.parse(raw) as DbSchema;
+
+    // Auto-fix: Ensure customers array exists
+    if (!db.customers) {
+      db.customers = [];
+      writeDb(db); // Save the fixed database
+    }
+
+    return db;
   } catch {
-    return { accounts: [], shops: [], shippingCompanies: [] };
+    return { accounts: [], shops: [], shippingCompanies: [], customers: [] };
   }
 }
 
@@ -71,7 +96,7 @@ function ensureSeeded() {
 
   if (db.shops.length === 0) {
     const shops: ShopRecord[] = seedShops.map((s) => ({
-      id: crypto.randomUUID(),
+      id: s.id || crypto.randomUUID(), // Use predefined ID or generate new one
       name: s["Tên lò sấy"],
       address: s["Địa điểm"],
       district: s["TP/Huyện"],
@@ -79,7 +104,8 @@ function ensureSeeded() {
       rating: s.Rating,
       limitCapacity: s.LimitCapacity,
       dryingPrice: s["Giá sấy lúa"],
-      dryingAndStoragePrice: s["Giá sấy và bảo quản lúa"],
+      username: s.username, // ← Thêm username
+      password: s.password, // ← Thêm password
       createdAt: Date.now(),
     }));
     const accounts: Account[] = [
@@ -112,11 +138,12 @@ function ensureSeeded() {
     db.shops = shops;
     needsUpdate = true;
   } else {
-    // Update existing shops with pricing data if missing
+    // Update existing shops with pricing data and credentials if missing
     const updatedShops = db.shops.map((shop) => {
       if (
         shop.dryingPrice === undefined ||
-        shop.dryingAndStoragePrice === undefined
+        shop.username === undefined ||
+        shop.password === undefined
       ) {
         // Find matching shop in seed data
         const seedShop = seedShops.find((s) => s["Tên lò sấy"] === shop.name);
@@ -124,7 +151,8 @@ function ensureSeeded() {
           return {
             ...shop,
             dryingPrice: seedShop["Giá sấy lúa"],
-            dryingAndStoragePrice: seedShop["Giá sấy và bảo quản lúa"],
+            username: seedShop.username,
+            password: seedShop.password,
           };
         }
       }
@@ -370,17 +398,18 @@ export const db = {
     writeDb(dbState);
   },
 
-  // Force update all shops with pricing data
+  // Force update all shops with pricing data and credentials
+  // Force update all shops with pricing data and credentials
   updateShopsWithPricing(): void {
     const dbState = readDb();
     const updatedShops = dbState.shops.map((shop) => {
-      // Find matching shop in seed data
       const seedShop = seedShops.find((s) => s["Tên lò sấy"] === shop.name);
       if (seedShop) {
         return {
           ...shop,
           dryingPrice: seedShop["Giá sấy lúa"],
-          dryingAndStoragePrice: seedShop["Giá sấy và bảo quản lúa"],
+          username: seedShop.username, // Sync username
+          password: seedShop.password, // Sync password
         };
       }
       return shop;
@@ -389,5 +418,73 @@ export const db = {
     dbState.shops = updatedShops;
     writeDb(dbState);
     emitShopsUpdated();
+  },
+
+  // Reset all shop passwords to "123456"
+  resetShopPasswords(): void {
+    const dbState = readDb();
+    const updatedShops = dbState.shops.map((shop) => ({
+      ...shop,
+      password: "123456",
+    }));
+
+    dbState.shops = updatedShops;
+    writeDb(dbState);
+    emitShopsUpdated();
+    console.log("✅ All shop passwords have been reset to '123456'");
+  },
+
+  // Customers
+  listCustomers(): Customer[] {
+    return readDb().customers || [];
+  },
+  getCustomer(id: string): Customer | undefined {
+    const customers = readDb().customers;
+    if (!customers) return undefined;
+    return customers.find((c) => c.id === id);
+  },
+  getCustomerByPhone(phoneNumber: string): Customer | undefined {
+    const customers = readDb().customers;
+    if (!customers) return undefined;
+    return customers.find((c) => c.phoneNumber === phoneNumber);
+  },
+  getCustomerByEmail(email: string): Customer | undefined {
+    const customers = readDb().customers;
+    if (!customers) return undefined;
+    return customers.find((c) => c.email === email);
+  },
+  createCustomer(input: Omit<Customer, "id" | "createdAt">): Customer {
+    const dbState = readDb();
+    if (!dbState.customers) {
+      dbState.customers = [];
+    }
+    const customer: Customer = {
+      ...input,
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+    };
+    dbState.customers.unshift(customer);
+    writeDb(dbState);
+    return customer;
+  },
+  updateCustomer(
+    id: string,
+    changes: Partial<Omit<Customer, "id" | "createdAt">>
+  ): Customer | undefined {
+    const dbState = readDb();
+    if (!dbState.customers) return undefined;
+    const idx = dbState.customers.findIndex((c) => c.id === id);
+    if (idx === -1) return undefined;
+    dbState.customers[idx] = { ...dbState.customers[idx], ...changes };
+    writeDb(dbState);
+    return dbState.customers[idx];
+  },
+  deleteCustomer(id: string): boolean {
+    const dbState = readDb();
+    if (!dbState.customers) return false;
+    const lenBefore = dbState.customers.length;
+    dbState.customers = dbState.customers.filter((c) => c.id !== id);
+    writeDb(dbState);
+    return dbState.customers.length < lenBefore;
   },
 };

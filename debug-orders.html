@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Orders - RiceLink</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4ade80;
+        }
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        button {
+            background: #4ade80;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #22c55e;
+        }
+        .error {
+            color: #ff6b6b;
+        }
+        .success {
+            color: #4ade80;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #333;
+        }
+        .shop-name {
+            font-weight: bold;
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Orders - RiceLink</h1>
+
+        <div class="section">
+            <h2>Controls</h2>
+            <button onclick="loadData()">🔄 Refresh Data</button>
+            <button onclick="clearOrders()">🗑️ Clear All Orders</button>
+            <button onclick="exportData()">📥 Export Data</button>
+        </div>
+
+        <div class="section">
+            <h2>📦 Orders in LocalStorage</h2>
+            <div id="orders-info"></div>
+            <pre id="orders-json"></pre>
+        </div>
+
+        <div class="section">
+            <h2>🏭 Available Shops</h2>
+            <div id="shops-info"></div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 Shop Name Analysis</h2>
+            <div id="shop-analysis"></div>
+        </div>
+    </div>
+
+    <script>
+        const SHOPS = [
+            { id: 1, name: "Nhà máy sấy lúa SÁU THO", username: "sautho" },
+            { id: 2, name: "Cơ sở sấy lúa Lệ Hoa", username: "lehoa" },
+            { id: 3, name: "Cơ sở sấy - Nhà máy Lộc Tấn", username: "loctan" },
+            { id: 4, name: "Cơ sở sấy lúa Kim Oanh", username: "kimoanh" },
+        ];
+
+        function loadData() {
+            // Load orders
+            const ordersRaw = localStorage.getItem('orders');
+            const orders = ordersRaw ? JSON.parse(ordersRaw) : [];
+
+            // Display orders info
+            const ordersInfo = document.getElementById('orders-info');
+            ordersInfo.innerHTML = `
+                <p><strong>Total orders:</strong> ${orders.length}</p>
+                ${orders.length > 0 ? `<p class="success">✅ Orders found in localStorage</p>` : `<p class="error">❌ No orders found</p>`}
+            `;
+
+            // Display orders JSON
+            const ordersJson = document.getElementById('orders-json');
+            ordersJson.textContent = JSON.stringify(orders, null, 2);
+
+            // Display shops info
+            const shopsInfo = document.getElementById('shops-info');
+            let shopsHtml = '<table><tr><th>ID</th><th>Shop Name</th><th>Username</th><th>Orders Count</th></tr>';
+            SHOPS.forEach(shop => {
+                const orderCount = orders.filter(o => o.shopName === shop.name).length;
+                shopsHtml += `
+                    <tr>
+                        <td>${shop.id}</td>
+                        <td class="shop-name">${shop.name}</td>
+                        <td>${shop.username}</td>
+                        <td>${orderCount} orders</td>
+                    </tr>
+                `;
+            });
+            shopsHtml += '</table>';
+            shopsInfo.innerHTML = shopsHtml;
+
+            // Shop name analysis
+            const analysisDiv = document.getElementById('shop-analysis');
+            let analysisHtml = '<table><tr><th>Order ID</th><th>Shop Name in Order</th><th>Length</th><th>Char Codes</th><th>Match Status</th></tr>';
+
+            orders.forEach(order => {
+                const shopName = order.shopName || '';
+                const charCodes = Array.from(shopName).map(c => c.charCodeAt(0)).join(', ');
+                const matches = SHOPS.find(s => s.name === shopName);
+                const status = matches ?
+                    '<span class="success">✅ Exact Match</span>' :
+                    '<span class="error">❌ No Match</span>';
+
+                analysisHtml += `
+                    <tr>
+                        <td>${order.id.substring(0, 8)}...</td>
+                        <td class="shop-name">${shopName}</td>
+                        <td>${shopName.length}</td>
+                        <td style="font-size: 10px;">${charCodes}</td>
+                        <td>${status}</td>
+                    </tr>
+                `;
+            });
+            analysisHtml += '</table>';
+
+            // Check for similar names
+            if (orders.length > 0) {
+                analysisHtml += '<h3 style="margin-top: 20px;">Shop Names Comparison:</h3>';
+                const uniqueShopNames = [...new Set(orders.map(o => o.shopName).filter(Boolean))];
+                uniqueShopNames.forEach(orderShopName => {
+                    analysisHtml += `<div style="margin: 10px 0; padding: 10px; background: #1a1a1a; border-radius: 4px;">`;
+                    analysisHtml += `<p><strong>Order Shop Name:</strong> "${orderShopName}"</p>`;
+
+                    SHOPS.forEach(shop => {
+                        const exactMatch = shop.name === orderShopName;
+                        const trimMatch = shop.name.trim() === orderShopName.trim();
+                        const lowerMatch = shop.name.toLowerCase() === orderShopName.toLowerCase();
+
+                        if (exactMatch || trimMatch || lowerMatch || shop.name.includes(orderShopName) || orderShopName.includes(shop.name)) {
+                            analysisHtml += `<p style="margin-left: 20px;">
+                                📍 Database: "${shop.name}"
+                                ${exactMatch ? '<span class="success">(✅ Exact)</span>' : ''}
+                                ${!exactMatch && trimMatch ? '<span class="success">(✅ Trim Match)</span>' : ''}
+                                ${!exactMatch && !trimMatch && lowerMatch ? '<span class="success">(⚠️ Case Insensitive)</span>' : ''}
+                            </p>`;
+                        }
+                    });
+                    analysisHtml += `</div>`;
+                });
+            }
+
+            analysisDiv.innerHTML = analysisHtml;
+        }
+
+        function clearOrders() {
+            if (confirm('Are you sure you want to clear all orders?')) {
+                localStorage.removeItem('orders');
+                loadData();
+                alert('All orders cleared!');
+            }
+        }
+
+        function exportData() {
+            const ordersRaw = localStorage.getItem('orders');
+            const orders = ordersRaw ? JSON.parse(ordersRaw) : [];
+            const dataStr = JSON.stringify(orders, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'orders-export.json';
+            link.click();
+        }
+
+        // Load data on page load
+        loadData();
+
+        // Auto-refresh every 5 seconds
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>
+

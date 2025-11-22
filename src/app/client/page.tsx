@@ -15,11 +15,16 @@ import {
   Search,
   Trash2,
   Truck,
+  User,
+  LogOut,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import Chatbot from "../components/Chatbot";
+import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
+import CustomerAuthModal from "../components/CustomerAuthModal";
+import LandingPage from "../components/LandingPage";
 
 type Order = {
   id: string;
@@ -32,13 +37,15 @@ type Order = {
   // Thông tin bổ sung
   clientAddress?: string;
   clientCapacity?: number;
-  shopName?: string;
+  shopId?: string; // ID của shop - dùng để filter
+  shopName?: string; // Tên shop - dùng để hiển thị
   shippingCompany?: string;
   serviceType?: "drying" | "dryingAndStorage"; // Loại dịch vụ
-  servicePrice?: number; // Giá dịch vụ
+  servicePrice?: number; // Giá sấy
   // Thông tin mới
   moistureType?: "unconfirmed" | "estimated" | "actual"; // Loại độ ẩm
   moistureValue?: string; // Giá trị độ ẩm
+  storageDays?: string; // Số ngày bảo quản (chỉ cho dịch vụ "Sấy và bảo quản")
   deliveryDate?: string; // Ngày giao lúa
   deliveryTime?: string; // Giờ giao lúa
   paymentMethod?: string; // Phương thức thanh toán
@@ -71,6 +78,8 @@ function loadOrders(): Order[] {
 function saveOrders(orders: Order[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+  // Dispatch custom event to notify same-tab components
+  window.dispatchEvent(new CustomEvent("ordersUpdated", { detail: orders }));
 }
 
 function loadChatMessages(): ChatMessage[] {
@@ -125,6 +134,9 @@ function getStatusConfig(status: Order["status"]) {
 }
 
 export default function ClientPage() {
+  const { currentCustomer, isAuthenticated, logout } = useCustomerAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [tab, setTab] = useState<"orders" | "booking" | "chat">("orders");
   const [orders, setOrders] = useState<Order[]>([]);
   const [clientName, setClientName] = useState("");
@@ -141,8 +153,7 @@ export default function ClientPage() {
   );
   const [selectedChat, setSelectedChat] = useState(1);
   const [messageInput, setMessageInput] = useState("");
-  const [capacityType, setCapacityType] = useState<"unconfirmed" | "estimated" | "actual">("unconfirmed");
-  const [capacityValue, setCapacityValue] = useState("");
+  const [storageDays, setStorageDays] = useState(""); // Thời gian bảo quản (ngày)
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -177,6 +188,14 @@ export default function ClientPage() {
     }
   }, []);
 
+  // Auto-fill customer info when logged in
+  useEffect(() => {
+    if (currentCustomer && isAuthenticated) {
+      setClientName(currentCustomer.name);
+      setPhoneNumber(currentCustomer.phoneNumber);
+    }
+  }, [currentCustomer, isAuthenticated]);
+
   useEffect(() => {
     saveOrders(orders);
   }, [orders]);
@@ -185,14 +204,51 @@ export default function ClientPage() {
     saveChatMessages(chatMessages);
   }, [chatMessages]);
 
-  // Poll for new messages every 2 seconds
+  // Poll for new orders and messages every 2 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       if (typeof window !== "undefined") {
+        setOrders(loadOrders());
         setChatMessages(loadChatMessages());
       }
     }, 2000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Listen for storage changes from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const newOrders = JSON.parse(e.newValue) as Order[];
+          setOrders(newOrders);
+        } catch (error) {
+          console.error("Failed to parse orders from storage event:", error);
+        }
+      } else if (e.key === CHAT_STORAGE_KEY && e.newValue) {
+        try {
+          const newMessages = JSON.parse(e.newValue) as ChatMessage[];
+          setChatMessages(newMessages);
+        } catch (error) {
+          console.error("Failed to parse messages from storage event:", error);
+        }
+      }
+    };
+
+    // Listen for custom event from same tab
+    const handleOrdersUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<Order[]>;
+      if (customEvent.detail) {
+        setOrders(customEvent.detail);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("ordersUpdated", handleOrdersUpdated);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("ordersUpdated", handleOrdersUpdated);
+    };
   }, []);
 
   const sortedOrders = useMemo(() => {
@@ -213,7 +269,7 @@ export default function ClientPage() {
 
     const now = new Date();
     const newMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       chatId: selectedChat,
       sender: "client",
       text: messageInput.trim(),
@@ -225,9 +281,67 @@ export default function ClientPage() {
     setMessageInput("");
   }
 
+  function handleLogout() {
+    const confirmLogout = window.confirm(
+      "Bạn có chắc chắn muốn đăng xuất?\n\nBạn sẽ cần đăng nhập lại để đặt lịch."
+    );
+
+    if (confirmLogout) {
+      logout();
+      // Clear form data
+      setClientName("");
+      setPhoneNumber("");
+      // Show success notification
+      setNotification({ message: "Đã đăng xuất thành công!", type: 'success' });
+      // Auto hide after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+    }
+  }
+
+  // Show Landing Page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Chatbot />
+        <LandingPage onOpenAuthModal={(mode) => setShowAuthModal(true)} />
+        {showAuthModal && <CustomerAuthModal onClose={() => setShowAuthModal(false)} />}
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900">
       <Chatbot />
+      {showAuthModal && <CustomerAuthModal onClose={() => setShowAuthModal(false)} />}
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-20 right-4 z-50 animate-slide-in">
+          <div className={`px-6 py-4 rounded-lg shadow-2xl border-l-4 flex items-center space-x-3 ${
+            notification.type === 'success' 
+              ? 'bg-green-600 border-green-400 text-white' 
+              : notification.type === 'error'
+              ? 'bg-red-600 border-red-400 text-white'
+              : 'bg-blue-600 border-blue-400 text-white'
+          }`}>
+            <div className="text-2xl">
+              {notification.type === 'success' ? '✅' : notification.type === 'error' ? '❌' : 'ℹ️'}
+            </div>
+            <div>
+              <p className="font-semibold">{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-white hover:text-gray-200"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-gray-800 shadow-2xl border-b-4 border-green-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -248,9 +362,34 @@ export default function ClientPage() {
                 <p className="text-sm text-gray-400">Kết nối chuỗi giá trị lúa gạo</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 bg-green-900 px-4 py-2 rounded-full">
-              <Navigation className="w-4 h-4 text-green-400" />
-              <span className="text-sm font-medium text-green-300">Đồng Tháp, Việt Nam</span>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-green-900 px-4 py-2 rounded-full">
+                <Navigation className="w-4 h-4 text-green-400" />
+                <span className="text-sm font-medium text-green-300">Đồng Tháp, Việt Nam</span>
+              </div>
+              {isAuthenticated && currentCustomer ? (
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 bg-gray-700 px-4 py-2 rounded-full">
+                    <User className="w-4 h-4 text-green-400" />
+                    <span className="text-sm font-medium text-white">{currentCustomer.name}</span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-full transition-colors"
+                    title="Đăng xuất"
+                  >
+                    <LogOut className="w-4 h-4 text-white" />
+                    <span className="text-sm font-medium text-white hidden sm:inline">Đăng xuất</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-2 rounded-full font-medium transition-all shadow-lg"
+                >
+                  Đăng nhập / Đăng ký
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -357,7 +496,7 @@ export default function ClientPage() {
                             )}
                             {o.shopName && (
                               <div>
-                                <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tên lò sấy</p>
+                                <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Tên cơ sở sấy</p>
                                 <p className="text-white flex items-center">
                                   <Package className="w-4 h-4 mr-2 text-green-400" />
                                   {o.shopName}
@@ -391,16 +530,14 @@ export default function ClientPage() {
                             )}
                             {o.servicePrice && (
                               <div>
-                                <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Giá dịch vụ</p>
+                                <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Giá sấy</p>
                                 <p className="text-yellow-400 font-bold">💰 {o.servicePrice.toLocaleString("vi-VN")} VNĐ/Tấn</p>
                               </div>
                             )}
                             {o.moistureType && o.moistureType !== "unconfirmed" && o.moistureValue && (
                               <div>
-                                <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Độ ẩm của lúa</p>
-                                <p className="text-white">
-                                  💧 {o.moistureValue}% ({o.moistureType === "estimated" ? "Ước tính" : "Thực tế"})
-                                </p>
+                                <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Thời gian bảo quản</p>
+                                <p className="text-white">📦 {o.storageDays} ngày</p>
                               </div>
                             )}
                             {o.deliveryDate && (
@@ -418,15 +555,18 @@ export default function ClientPage() {
                             {o.paymentMethod && (
                               <div>
                                 <p className="text-xs text-gray-300 uppercase tracking-wider mb-1">Phương thức thanh toán</p>
-                                <p className="text-white">
-                                  💳 {
-                                    o.paymentMethod === "cash" ? "Tiền mặt" :
-                                    o.paymentMethod === "bank_transfer" ? "Chuyển khoản" :
-                                    o.paymentMethod === "momo" ? "MoMo" :
-                                    o.paymentMethod === "zalopay" ? "ZaloPay" :
-                                    o.paymentMethod === "vnpay" ? "VNPay" : o.paymentMethod
-                                  }
-                                </p>
+                              <p className="text-white">
+                                    💳 {
+                                      o.paymentMethod === "momo" ? "Momo" :
+                                      o.paymentMethod === "vnpay" ? "VnPay" :
+                                      o.paymentMethod === "zalopay" ? "ZaloPay" :
+                                      o.paymentMethod === "viettel_money" ? "Viettel Money" :
+                                      o.paymentMethod === "bank" ? "Ngân hàng" :
+                                      o.paymentMethod === "visa" ? "Thẻ Visa" :
+                                      o.paymentMethod === "master" ? "Thẻ Master" :
+                                      o.paymentMethod === "icb" ? "ICB" : o.paymentMethod
+                                    }
+                                  </p>
                               </div>
                             )}
                           </div>
@@ -636,8 +776,12 @@ export default function ClientPage() {
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Nhập tên khách hàng"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    disabled={isAuthenticated}
+                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                  {isAuthenticated && (
+                    <p className="mt-1 text-xs text-green-400">✓ Đã tự động điền từ tài khoản</p>
+                  )}
                 </div>
 
                 <div className="mb-4">
@@ -655,8 +799,12 @@ export default function ClientPage() {
                       }
                     }}
                     placeholder="Nhập số điện thoại"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    disabled={isAuthenticated}
+                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                  {isAuthenticated && (
+                    <p className="mt-1 text-xs text-green-400">✓ Đã tự động điền từ tài khoản</p>
+                  )}
                 </div>
 
                 {/* Service Type */}
@@ -677,47 +825,28 @@ export default function ClientPage() {
                   </div>
                 </div>
 
-                {/* Capacity Type Dropdown */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Độ ẩm của lúa
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={capacityType}
-                      onChange={(e) => setCapacityType(e.target.value as "unconfirmed" | "estimated" | "actual")}
-                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl appearance-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                    >
-                      <option value="unconfirmed">Chưa xác định</option>
-                      <option value="estimated">Ước tính</option>
-                      <option value="actual">Đo thực tế</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Capacity Value Input - only show when not "unconfirmed" */}
-                {capacityType !== "unconfirmed" && (
+                {/* Storage Days - only show when serviceType is "dryingAndStorage" */}
+                {serviceType === "dryingAndStorage" && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {capacityType === "estimated" ? "Độ ẩm ước tính của lúa"  : "Độ ẩm thực tế của lúa"}
+                      Thời gian bảo quản mong muốn
                     </label>
                     <input
                       type="number"
-                      value={capacityValue}
-                      max={100}
+                      value={storageDays}
                       min={0}
                       onChange={(e) => {
                         const value = parseFloat(e.target.value);
-                        if (e.target.value === '' || (value >= 0 && value <= 100)) {
-                          setCapacityValue(e.target.value);
+                        if (e.target.value === '' || value >= 0) {
+                          setStorageDays(e.target.value);
                         }
                       }}
-                      placeholder={capacityType === "estimated" ? "Nhập độ ẩm ước tính (%)" : "Nhập độ ẩm thực tế (%)"}
+                      placeholder="Nhập số ngày bảo quản"
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                     />
                   </div>
                 )}
+
 
                 {/* Transport Checkbox */}
                 <div className="mb-4">
@@ -843,11 +972,14 @@ export default function ClientPage() {
                       className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 rounded-xl appearance-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                     >
                       <option value="">Chọn phương thức...</option>
-                      <option value="cash">Tiền mặt</option>
-                      <option value="bank_transfer">Chuyển khoản ngân hàng</option>
-                      <option value="momo">Ví MoMo</option>
+                      <option value="momo">Momo</option>
+                      <option value="vnpay">VnPay</option>
                       <option value="zalopay">ZaloPay</option>
-                      <option value="vnpay">VNPay</option>
+                      <option value="viettel_money">Viettel Money</option>
+                      <option value="bank">Ngân hàng</option>
+                      <option value="visa">Thẻ Visa</option>
+                      <option value="master">Thẻ Master</option>
+                      <option value="icb">ICB</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>
@@ -861,7 +993,18 @@ export default function ClientPage() {
             {/* Right Side - Map */}
             <div className="lg:col-span-2">
               <MapClient
-                onSelectShop={(shopName, address, capacity, shopData) => {
+                onSelectShop={(shopId, shopName, address, capacity, shopData) => {
+                  console.log('📍 Client: Received shop selection');
+                  console.log('Shop ID:', shopId);
+                  console.log('Shop Name:', shopName);
+
+                  // Check if user is logged in
+                  if (!isAuthenticated) {
+                    alert("Vui lòng đăng nhập trước khi đặt lịch.");
+                    setShowAuthModal(true);
+                    return;
+                  }
+
                   if (!clientName.trim()) {
                     alert("Vui lòng nhập tên khách hàng trước.");
                     return;
@@ -874,10 +1017,6 @@ export default function ClientPage() {
                     alert(
                       "Vui lòng chọn đơn vị vận chuyển hoặc đánh dấu đã có đơn vị vận chuyển."
                     );
-                    return;
-                  }
-                  if (capacityType !== "unconfirmed" && !capacityValue.trim()) {
-                    alert("Vui lòng nhập độ ẩm của lúa.");
                     return;
                   }
                   if (!deliveryDate) {
@@ -902,13 +1041,17 @@ export default function ClientPage() {
                     serviceType === "drying"
                       ? "Sấy lúa"
                       : "Sấy và bảo quản lúa";
-                  const servicePrice =
-                    serviceType === "drying"
-                      ? shopData?.dryingPrice || 0
-                      : shopData?.dryingAndStoragePrice || 0;
+                  // Use only dryingPrice for both service types
+                  const servicePrice = shopData?.dryingPrice || 0;
+
+                  console.log('🔍 DEBUG: Creating new order');
+                  console.log('Shop ID:', shopId);
+                  console.log('Shop Name from MapClient:', `"${shopName}"`);
+                  console.log('Shop Name length:', shopName.length);
+                  console.log('Shop Name char codes:', Array.from(shopName).map(c => c.charCodeAt(0)));
 
                   const newOrder: Order = {
-                    id: crypto.randomUUID(),
+                    id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     clientName: clientName.trim(),
                     phoneNumber: phoneNumber.trim(),
                     item: `${serviceTypeText} ${capacity} Tấn · ${shopName}`,
@@ -917,29 +1060,51 @@ export default function ClientPage() {
                     createdAt: Date.now(),
                     clientAddress: address,
                     clientCapacity: capacity,
-                    shopName: shopName,
+                    shopId: shopId, // Save shop ID for filtering
+                    shopName: shopName, // Keep name for display
                     shippingCompany: shippingCompanyName,
                     serviceType: serviceType,
                     servicePrice: servicePrice,
-                    moistureType: capacityType,
-                    moistureValue: capacityValue,
+                    storageDays: serviceType === "dryingAndStorage" ? storageDays : undefined,
                     deliveryDate: deliveryDate,
                     deliveryTime: deliveryTime,
                     paymentMethod: paymentMethod,
                     pricePerKm: hasShippingCompany ? 0 : pricePerKm,
                     paymentStatus: "unpaid",
                   };
+
+                  console.log('📦 New order created:', newOrder);
+                  console.log('💾 Saving to localStorage...');
+
                   setOrders((prev) => [newOrder, ...prev]);
-                  setClientName("");
-                  setPhoneNumber("");
+
+                  // Only reset name and phone if not authenticated
+                  // If authenticated, keep customer info for next order
+                  if (!isAuthenticated) {
+                    setClientName("");
+                    setPhoneNumber("");
+                  }
+
+                  // Reset other fields
                   setHasShippingCompany(false);
                   setSelectedShippingCompany("");
                   setServiceType("drying");
-                  setCapacityType("unconfirmed");
-                  setCapacityValue("");
+                  setStorageDays(""); // Reset storage days
                   setDeliveryDate("");
                   setDeliveryTime("");
                   setPaymentMethod("");
+
+                  // Show success notification
+                  setNotification({
+                    message: "Đặt lịch thành công! Đơn hàng đã được ghi nhận.",
+                    type: 'success'
+                  });
+
+                  // Auto hide notification after 3 seconds
+                  setTimeout(() => {
+                    setNotification(null);
+                  }, 3000);
+
                   setTab("orders");
                 }}
               />

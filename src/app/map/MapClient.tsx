@@ -46,10 +46,11 @@ type BookingProps = {
   initialAddressText?: string;
   initialCapacity?: number;
   onSelectShop?: (
+    shopId: string,
     shopName: string,
     address: string,
     capacity: number,
-    shopData?: { dryingPrice: number; dryingAndStoragePrice: number }
+    shopData?: { dryingPrice: number }
   ) => void;
 };
 
@@ -68,23 +69,23 @@ export default function MapClient(props: BookingProps = {}) {
   );
   const [eligibleList, setEligibleList] = useState<
     {
+      id?: string; // Shop ID for filtering
       name: string;
       distance: number;
       rating: number;
       capacity: number;
       dryingPrice: number;
-      dryingAndStoragePrice: number;
     }[]
   >([]);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     show: boolean;
     shop: {
+      id?: string; // Add ID field
       name: string;
       distance: number;
       capacity: number;
       dryingPrice: number;
-      dryingAndStoragePrice: number;
     };
   } | null>(null);
 
@@ -97,6 +98,7 @@ export default function MapClient(props: BookingProps = {}) {
   const [shops, setShops] = useState<
     {
       STT: number;
+      id?: string; // Add ID field
       "Tên lò sấy": string;
       "TP/Huyện": string;
       "Địa điểm": string;
@@ -104,7 +106,6 @@ export default function MapClient(props: BookingProps = {}) {
       Rating: number;
       LimitCapacity: number;
       "Giá sấy lúa": number;
-      "Giá sấy và bảo quản lúa": number;
     }[]
   >([]);
 
@@ -113,6 +114,7 @@ export default function MapClient(props: BookingProps = {}) {
       const dbShops = db.listShops();
       const result = dbShops.map((shop) => ({
         STT: 0, // Not used in this context
+        id: shop.id, // Include shop ID
         "Tên lò sấy": shop.name,
         "TP/Huyện": shop.district,
         "Địa điểm": shop.address,
@@ -122,7 +124,6 @@ export default function MapClient(props: BookingProps = {}) {
         LimitCapacity:
           shop.limitCapacity || Math.floor(Math.random() * 1500) + 500, // 500–2000
         "Giá sấy lúa": shop.dryingPrice || 0,
-        "Giá sấy và bảo quản lúa": shop.dryingAndStoragePrice || 0,
       }));
       setShops(result);
     }
@@ -135,6 +136,7 @@ export default function MapClient(props: BookingProps = {}) {
         const dbShops = db.listShops();
         const result = dbShops.map((shop) => ({
           STT: 0,
+          id: shop.id, // Include shop ID
           "Tên lò sấy": shop.name,
           "TP/Huyện": shop.district,
           "Địa điểm": shop.address,
@@ -144,7 +146,6 @@ export default function MapClient(props: BookingProps = {}) {
           LimitCapacity:
             shop.limitCapacity || Math.floor(Math.random() * 1500) + 500,
           "Giá sấy lúa": shop.dryingPrice || 0,
-          "Giá sấy và bảo quản lúa": shop.dryingAndStoragePrice || 0,
         }));
         setShops(result);
       }
@@ -157,6 +158,8 @@ export default function MapClient(props: BookingProps = {}) {
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
+    // Prevent creating multiple map instances (React Strict Mode runs effect twice)
+    if (mapRef.current) return;
 
     const mapInstance = new vietmapgl.Map({
       container: mapContainerRef.current,
@@ -169,11 +172,30 @@ export default function MapClient(props: BookingProps = {}) {
     mapRef.current = mapInstance;
 
     return () => {
-      // Clean up shop markers
-      shopMarkersRef.current.forEach((marker) => marker.remove());
-      shopMarkersRef.current = [];
+      // Clean up shop markers safely
+      try {
+        shopMarkersRef.current.forEach((marker) => {
+          if (marker) marker.remove();
+        });
+        shopMarkersRef.current = [];
+      } catch (err) {
+        console.warn("Error removing markers:", err);
+      }
 
-      mapInstance.remove();
+      // Remove map instance safely
+      try {
+        if (mapInstance) {
+          // Check if map is still valid before removing
+          const container = mapInstance.getContainer?.();
+          if (container && container.parentNode) {
+            mapInstance.remove();
+          }
+        }
+      } catch {
+        // Silently ignore any errors during cleanup
+        // This is expected when component unmounts during map operations
+      }
+
       mapRef.current = null;
     };
   }, [apiKey]);
@@ -183,20 +205,20 @@ export default function MapClient(props: BookingProps = {}) {
     if (!mapRef.current) return;
 
     const mapInstance = mapRef.current;
-
-    // Wait for map to be fully loaded before adding markers
-    if (!mapInstance.isStyleLoaded()) {
-      mapInstance.on("style.load", () => {
-        renderShopMarkers(mapInstance);
-      });
-    } else {
-      renderShopMarkers(mapInstance);
-    }
+    let isCleanedUp = false;
 
     function renderShopMarkers(map: vietmapgl.Map) {
-      // Clear existing shop markers
-      shopMarkersRef.current.forEach((marker) => marker.remove());
-      shopMarkersRef.current = [];
+      if (isCleanedUp) return; // Don't render if component is unmounting
+
+      // Clear existing shop markers safely
+      try {
+        shopMarkersRef.current.forEach((marker) => {
+          if (marker) marker.remove();
+        });
+        shopMarkersRef.current = [];
+      } catch (err) {
+        console.warn("Error removing old markers:", err);
+      }
 
       if (shops.length === 0) return;
 
@@ -229,51 +251,117 @@ export default function MapClient(props: BookingProps = {}) {
         map.fitBounds(bounds, { padding: 40 });
       }
     }
+
+    // Wait for map to be fully loaded before adding markers
+    if (!mapInstance.isStyleLoaded()) {
+      const onStyleLoad = () => {
+        renderShopMarkers(mapInstance);
+      };
+      mapInstance.on("style.load", onStyleLoad);
+
+      return () => {
+        isCleanedUp = true;
+        mapInstance.off("style.load", onStyleLoad);
+      };
+    } else {
+      renderShopMarkers(mapInstance);
+    }
   }, [shops]);
 
   const geocodeAddress = useCallback(
     async (text: string): Promise<{ lat: number; lon: number } | null> => {
       if (!apiKey || !text.trim()) return null;
-      const url = new URL("https://maps.vietmap.vn/api/search");
-      url.searchParams.set("api-version", "1.1");
-      url.searchParams.set("apikey", apiKey);
-      url.searchParams.set("text", text.trim());
 
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`Geocode failed (${res.status})`);
-      const data = await res.json();
-      console.log("Geocode response", data);
+      console.log("🔍 Tìm kiếm địa chỉ:", text.trim());
 
-      // Try common shapes for Vietmap search results
-      // Case A: top-level FeatureCollection
-      const fromFeatures = data?.features?.[0]?.geometry?.coordinates;
-      if (Array.isArray(fromFeatures) && fromFeatures.length >= 2) {
-        const [lon, lat] = fromFeatures as [number, number];
-        return { lat, lon };
+      // Use VietMap API v3 Search
+      const searchUrl = new URL("https://maps.vietmap.vn/api/search/v3");
+      searchUrl.searchParams.set("apikey", apiKey);
+      searchUrl.searchParams.set("text", text.trim());
+
+      const searchRes = await fetch(searchUrl.toString());
+      if (!searchRes.ok) {
+        console.error("❌ API error:", searchRes.status);
+        throw new Error(`Geocode failed (${searchRes.status})`);
       }
-      // Case B: wrapped in data: { type: 'FeatureCollection', features: [...] }
-      const wrappedFcCoords = data?.data?.features?.[0]?.geometry?.coordinates;
-      if (Array.isArray(wrappedFcCoords) && wrappedFcCoords.length >= 2) {
-        const [lon, lat] = wrappedFcCoords as [number, number];
-        return { lat, lon };
+
+      const data = await searchRes.json();
+      console.log("📦 API v3 response:", data);
+      console.log("📊 Số kết quả:", Array.isArray(data) ? data.length : 0);
+
+      // VietMap API v3 returns array of results directly
+      if (!Array.isArray(data) || data.length === 0) {
+        console.warn("⚠️ Không tìm thấy kết quả");
+        return null;
       }
-      const first =
-        (Array.isArray(data?.data) ? data.data[0] : data?.result?.[0]) || null;
-      if (
-        first &&
-        typeof first.lat === "number" &&
-        typeof first.lon === "number"
-      ) {
-        return { lat: first.lat, lon: first.lon };
+
+      const first = data[0];
+      console.log("🎯 Kết quả đầu tiên:", {
+        name: first.name,
+        display: first.display,
+        address: first.address,
+      });
+
+      // Try 1: Get from Place Detail API v3
+      if (first.ref_id) {
+        const detailUrl = new URL("https://maps.vietmap.vn/api/place/v3");
+        detailUrl.searchParams.set("apikey", apiKey);
+        detailUrl.searchParams.set("refid", first.ref_id);
+
+        console.log("📍 Lấy tọa độ từ Place API...");
+
+        try {
+          const detailRes = await fetch(detailUrl.toString());
+          if (detailRes.ok) {
+            const detailData = await detailRes.json();
+            console.log("📍 Chi tiết địa điểm:", detailData);
+
+            if (detailData.lat && detailData.lng) {
+              console.log("✅ Tọa độ:", [detailData.lng, detailData.lat]);
+              return { lat: detailData.lat, lon: detailData.lng };
+            }
+          }
+        } catch (err) {
+          console.warn("⚠️ Place API không hoạt động, thử cách khác...", err);
+        }
       }
-      if (
-        first &&
-        typeof first.latitude === "number" &&
-        typeof first.longitude === "number"
-      ) {
-        return { lat: first.latitude, lon: first.longitude };
+
+      // Try 2: Use Autocomplete API (may have lat/lng)
+      const autocompleteUrl = new URL(
+        "https://maps.vietmap.vn/api/autocomplete/v3"
+      );
+      autocompleteUrl.searchParams.set("apikey", apiKey);
+      autocompleteUrl.searchParams.set("text", text.trim());
+
+      console.log("📍 Lấy tọa độ từ Autocomplete API...");
+
+      try {
+        const autocompleteRes = await fetch(autocompleteUrl.toString());
+        if (autocompleteRes.ok) {
+          const autocompleteData = await autocompleteRes.json();
+          console.log("📦 Autocomplete response:", autocompleteData);
+
+          if (
+            Array.isArray(autocompleteData) &&
+            autocompleteData.length > 0
+          ) {
+            const firstResult = autocompleteData[0];
+
+            if (firstResult.lat && firstResult.lng) {
+              console.log("✅ Tọa độ từ Autocomplete:", [
+                firstResult.lng,
+                firstResult.lat,
+              ]);
+              return { lat: firstResult.lat, lon: firstResult.lng };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("⚠️ Autocomplete API không hoạt động", err);
       }
-      throw new Error(`No results for: "${text.trim()}"`);
+
+      console.error("❌ Không tìm thấy tọa độ từ cả 2 API");
+      return null;
     },
     [apiKey]
   );
@@ -293,11 +381,15 @@ export default function MapClient(props: BookingProps = {}) {
   const clearAllRoutes = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (map.getLayer(ROUTES_LAYER_ALL_ID)) map.removeLayer(ROUTES_LAYER_ALL_ID);
-    if (map.getLayer(ROUTES_LAYER_SHORTEST_ID))
-      map.removeLayer(ROUTES_LAYER_SHORTEST_ID);
-    if (map.getLayer(ROUTES_LAYER_ID)) map.removeLayer(ROUTES_LAYER_ID);
-    if (map.getSource(ROUTES_SOURCE_ID)) map.removeSource(ROUTES_SOURCE_ID);
+    try {
+      if (map.getLayer(ROUTES_LAYER_ALL_ID)) map.removeLayer(ROUTES_LAYER_ALL_ID);
+      if (map.getLayer(ROUTES_LAYER_SHORTEST_ID))
+        map.removeLayer(ROUTES_LAYER_SHORTEST_ID);
+      if (map.getLayer(ROUTES_LAYER_ID)) map.removeLayer(ROUTES_LAYER_ID);
+      if (map.getSource(ROUTES_SOURCE_ID)) map.removeSource(ROUTES_SOURCE_ID);
+    } catch (err) {
+      console.warn("Error clearing routes:", err);
+    }
   }, []);
 
   const requestAndDrawRoutesToAllShops = useCallback(
@@ -345,11 +437,11 @@ export default function MapClient(props: BookingProps = {}) {
         const cap = Number(customerCapacity);
         type ShopLike = Pick<
           (typeof shops)[number],
+          | "id"
           | "Rating"
           | "LimitCapacity"
           | "Tên lò sấy"
           | "Giá sấy lúa"
-          | "Giá sấy và bảo quản lúa"
         >;
         const filteredSorted = valid
           .filter((r) =>
@@ -363,15 +455,25 @@ export default function MapClient(props: BookingProps = {}) {
             const rb = (b.shop as ShopLike).Rating ?? 0;
             return rb - ra;
           })
-          .map((r) => ({
-            name: (r.shop as ShopLike)["Tên lò sấy"],
-            distance: r.distance,
-            rating: (r.shop as ShopLike).Rating ?? 0,
-            capacity: (r.shop as ShopLike).LimitCapacity ?? 0,
-            dryingPrice: (r.shop as ShopLike)["Giá sấy lúa"] ?? 0,
-            dryingAndStoragePrice:
-              (r.shop as ShopLike)["Giá sấy và bảo quản lúa"] ?? 0,
-          }));
+          .map((r) => {
+            const shopName = (r.shop as ShopLike)["Tên lò sấy"];
+            const shopId = (r.shop as ShopLike).id;
+
+            // Debug: Log the entire shop object to see what's in it
+            console.log('🔍 DEBUG: Shop object:', r.shop);
+            console.log('🏭 Shop from database:', `"${shopName}"`);
+            console.log('🆔 Shop ID extracted:', shopId);
+            console.log('📦 Shop ID type:', typeof shopId);
+
+            return {
+              id: shopId, // Include shop ID
+              name: shopName,
+              distance: r.distance,
+              rating: (r.shop as ShopLike).Rating ?? 0,
+              capacity: (r.shop as ShopLike).LimitCapacity ?? 0,
+              dryingPrice: (r.shop as ShopLike)["Giá sấy lúa"] ?? 0,
+            };
+          });
         setEligibleList(filteredSorted);
 
         // Build FeatureCollection
@@ -445,15 +547,24 @@ export default function MapClient(props: BookingProps = {}) {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!apiKey) {
-        alert("Missing API key");
+        alert("⚠️ Thiếu API key cho bản đồ");
         return;
       }
-      if (!addressText.trim()) return;
+      if (!addressText.trim()) {
+        alert("⚠️ Vui lòng nhập địa chỉ");
+        return;
+      }
       try {
         const geo = await geocodeAddress(addressText);
         console.log("Geocode result", geo);
         if (!geo) {
-          alert("Address not found");
+          alert(
+            `❌ Không tìm thấy địa chỉ: "${addressText}"\n\n` +
+            `💡 Gợi ý:\n` +
+            `• Thử nhập địa chỉ chi tiết hơn (ví dụ: "Xã Thanh Mỹ, Huyện Thanh Bình, Đồng Tháp")\n` +
+            `• Kiểm tra chính tả\n` +
+            `• Thử nhập tên huyện hoặc thành phố`
+          );
           return;
         }
         const lngLat: [number, number] = [geo.lon, geo.lat];
@@ -464,7 +575,11 @@ export default function MapClient(props: BookingProps = {}) {
         await requestAndDrawRoutesToAllShops(geo.lat, geo.lon);
       } catch (err) {
         console.error(err);
-        alert((err as Error).message || "Failed to geocode");
+        alert(
+          `❌ Lỗi tìm kiếm địa chỉ\n\n` +
+          `Chi tiết: ${(err as Error).message || "Không xác định"}\n\n` +
+          `💡 Vui lòng thử lại hoặc nhập địa chỉ khác`
+        );
       }
     },
     [
@@ -510,24 +625,24 @@ export default function MapClient(props: BookingProps = {}) {
                 disabled={isRoutingAll}
                 className="px-4 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm font-medium hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isRoutingAll ? "Đang tìm lò sấy..." : "Tìm lò sấy"}
+                {isRoutingAll ? "Đang tìm cơ sở sấy..." : "Tìm cơ sở sấy"}
               </button>
             </form>
           </div>
         )}
         {apiKey && props.initialAddressText && (
           <div className="mt-2 text-center text-gray-400 text-sm">
-            Nhập địa chỉ và sản lượng ở form bên trái để tìm lò sấy phù hợp
+            Nhập địa chỉ và sản lượng ở form bên trái để tìm cơ sở sấy phù hợp
           </div>
         )}
       </div>
       <div className="h-[100vh] relative">
         <div ref={mapContainerRef} id="map" className="w-full h-full" />
         <div className="absolute top-26 right-4 w-80 max-h-[80vh] overflow-auto bg-white/95 backdrop-blur-sm border rounded shadow text-sm">
-          <div className="px-3 py-2 border-b font-semibold">Lò sấy phù hợp</div>
+          <div className="px-3 py-2 border-b font-semibold">Cơ sở sấy phù hợp</div>
           {eligibleList.length === 0 ? (
             <div className="px-3 py-2 text-gray-600">
-              Nhập địa chỉ và sản lượng, sau đó nhấn Tìm lò sấy.
+              Nhập địa chỉ và sản lượng, sau đó nhấn Tìm cơ sở sấy.
             </div>
           ) : (
             <ul className="divide-y">
@@ -538,7 +653,7 @@ export default function MapClient(props: BookingProps = {}) {
                   onClick={() => {
                     // Validate capacity first
                     if (!customerCapacity || Number(customerCapacity) <= 0) {
-                      alert("Vui lòng nhập sản lượng lúa (Tấn) trước khi chọn lò sấy.");
+                      alert("Vui lòng nhập sản lượng lúa (Tấn) trước khi chọn cơ sở sấy.");
                       return;
                     }
 
@@ -557,15 +672,8 @@ export default function MapClient(props: BookingProps = {}) {
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-gray-600">
-                    <div>
-                      Công suất: {s.capacity} Tấn · Giá sấy:{" "}
-                      {(s.dryingPrice || 0).toLocaleString("vi-VN")} VND/Tấn
-                    </div>
-                    <div>
-                      Giá Sấy + Bảo Quản:{" "}
-                      {(s.dryingAndStoragePrice || 0).toLocaleString("vi-VN")}{" "}
-                      VND/Tấn
-                    </div>
+                    Công suất: {s.capacity} Tấn · Giá sấy:{" "}
+                    {(s.dryingPrice || 0).toLocaleString("vi-VN")} VND/Tấn
                   </div>
                 </li>
               ))}
@@ -579,7 +687,7 @@ export default function MapClient(props: BookingProps = {}) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Bạn có muốn chọn lò sấy &ldquo;<span className="font-bold">{confirmDialog.shop.name}</span>&rdquo; không?
+              Bạn có muốn chọn cơ sở sấy &ldquo;<span className="font-bold">{confirmDialog.shop.name}</span>&rdquo; không?
             </h3>
             <div className="space-y-2 text-sm text-gray-700 mb-6">
               <div>
@@ -594,10 +702,6 @@ export default function MapClient(props: BookingProps = {}) {
                 <span className="font-medium">Giá sấy:</span>{" "}
                 {(confirmDialog.shop.dryingPrice || 0).toLocaleString("vi-VN")} VND/Tấn
               </div>
-              <div>
-                <span className="font-medium">Giá sấy + bảo quản:</span>{" "}
-                {(confirmDialog.shop.dryingAndStoragePrice || 0).toLocaleString("vi-VN")} VND/Tấn
-              </div>
             </div>
             <div className="flex gap-3 justify-end">
               <button
@@ -608,13 +712,19 @@ export default function MapClient(props: BookingProps = {}) {
               </button>
               <button
                 onClick={() => {
+                  console.log('🗺️ MapClient: Shop selected from dialog');
+                  console.log('Shop ID:', confirmDialog.shop.id);
+                  console.log('Shop Name:', `"${confirmDialog.shop.name}"`);
+                  console.log('Shop Name length:', confirmDialog.shop.name.length);
+                  console.log('Shop Name char codes:', Array.from(confirmDialog.shop.name).map(c => c.charCodeAt(0)));
+
                   props.onSelectShop?.(
+                    confirmDialog.shop.id || '', // Pass shop ID as first parameter
                     confirmDialog.shop.name,
                     addressText,
                     Number(customerCapacity),
                     {
                       dryingPrice: confirmDialog.shop.dryingPrice,
-                      dryingAndStoragePrice: confirmDialog.shop.dryingAndStoragePrice,
                     }
                   );
                   setConfirmDialog(null);

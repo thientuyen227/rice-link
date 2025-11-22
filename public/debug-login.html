@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Login Data</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        pre {
+            background: #000;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .shop {
+            background: #2a2a2a;
+            margin: 10px 0;
+            padding: 15px;
+            border-left: 4px solid #00ff00;
+        }
+        .error {
+            color: #ff0000;
+        }
+        .success {
+            color: #00ff00;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Login Data</h1>
+
+    <button onclick="checkData()">🔄 Reload Data</button>
+    <button onclick="testLogin()">🧪 Test Login (test/1234)</button>
+
+    <h2>📦 FakeDb Data (demo_db_v1):</h2>
+    <div id="fakedb-data"></div>
+
+    <h2>📦 CustomShops Data:</h2>
+    <div id="customshops-data"></div>
+
+    <h2>🔐 Test Login Result:</h2>
+    <div id="login-result"></div>
+
+    <script>
+        function checkData() {
+            // Check fakeDb
+            const fakeDbRaw = localStorage.getItem('demo_db_v1');
+            const fakeDbDiv = document.getElementById('fakedb-data');
+
+            if (fakeDbRaw) {
+                try {
+                    const fakeDb = JSON.parse(fakeDbRaw);
+                    const shops = fakeDb.shops || [];
+
+                    fakeDbDiv.innerHTML = `
+                        <p>✅ Found ${shops.length} shops</p>
+                        ${shops.map((shop, i) => `
+                            <div class="shop">
+                                <strong>${i + 1}. ${shop.name}</strong><br>
+                                Username: <span class="success">${shop.username || '❌ MISSING'}</span><br>
+                                Password: <span class="success">${shop.password || '❌ MISSING'}</span><br>
+                                ID: ${shop.id}
+                            </div>
+                        `).join('')}
+                    `;
+                } catch (e) {
+                    fakeDbDiv.innerHTML = `<pre class="error">Error parsing: ${e.message}</pre>`;
+                }
+            } else {
+                fakeDbDiv.innerHTML = '<p class="error">❌ No fakeDb data found!</p>';
+            }
+
+            // Check customShops
+            const customShopsRaw = localStorage.getItem('customShops');
+            const customShopsDiv = document.getElementById('customshops-data');
+
+            if (customShopsRaw) {
+                try {
+                    const customShops = JSON.parse(customShopsRaw);
+                    customShopsDiv.innerHTML = `<pre>${JSON.stringify(customShops, null, 2)}</pre>`;
+                } catch (e) {
+                    customShopsDiv.innerHTML = `<pre class="error">Error parsing: ${e.message}</pre>`;
+                }
+            } else {
+                customShopsDiv.innerHTML = '<p class="error">❌ No customShops data found!</p>';
+            }
+        }
+
+        function testLogin() {
+            const username = 'test';
+            const password = '1234';
+
+            const resultDiv = document.getElementById('login-result');
+
+            // Load from fakeDb
+            const fakeDbRaw = localStorage.getItem('demo_db_v1');
+            if (!fakeDbRaw) {
+                resultDiv.innerHTML = '<p class="error">❌ No fakeDb found!</p>';
+                return;
+            }
+
+            try {
+                const fakeDb = JSON.parse(fakeDbRaw);
+                const shops = fakeDb.shops || [];
+
+                // Try to find shop
+                const shop = shops.find(s =>
+                    s.username?.toLowerCase() === username.toLowerCase() &&
+                    s.password === password
+                );
+
+                if (shop) {
+                    resultDiv.innerHTML = `
+                        <div class="shop success">
+                            ✅ LOGIN SUCCESS!<br>
+                            Shop: ${shop.name}<br>
+                            Username: ${shop.username}<br>
+                            Password: ${shop.password}
+                        </div>
+                    `;
+                } else {
+                    // Show all shops with 'test' in username
+                    const testShops = shops.filter(s =>
+                        s.username?.toLowerCase().includes('test') ||
+                        s.name?.toLowerCase().includes('test')
+                    );
+
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ LOGIN FAILED!</p>
+                        <p>Looking for: username="${username}", password="${password}"</p>
+                        ${testShops.length > 0 ? `
+                            <p>Found shops with "test":</p>
+                            ${testShops.map(s => `
+                                <div class="shop">
+                                    Name: ${s.name}<br>
+                                    Username: ${s.username}<br>
+                                    Password: ${s.password}
+                                </div>
+                            `).join('')}
+                        ` : '<p>No shops found with "test"</p>'}
+                    `;
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `<pre class="error">Error: ${e.message}</pre>`;
+            }
+        }
+
+        // Auto load on page load
+        checkData();
+    </script>
+</body>
+</html>
+
